@@ -1,0 +1,95 @@
+/*
+
+Copyright 2020 - tomw
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+-------------------------------------------
+
+Change history:
+
+1.0.0 - @tomw - Initial release
+
+*/
+
+metadata
+{
+    definition(name: "UniFi Protect Camera", namespace: "tomw", author: "tomw", importUrl: "")
+    {
+        capability "ImageCapture"
+        capability "MotionSensor"
+        
+        command "motionActive"
+        command "motionInactive"
+        
+        command "clearImages"
+        
+        attribute "displayImage", "string"
+    }
+}
+
+def installed()
+{
+    sendEvent(name: "motion", value: "inactive")
+}
+
+def motionActive()
+{
+    sendEvent(name: "motion", value: "active")
+}
+
+def motionInactive()
+{
+    sendEvent(name: "motion", value: "inactive")
+}
+
+def take()
+{
+    try
+    {
+        def stream = getParent()?.httpExecWithAuthCheck("GET", parent?.genParamsMain(getCameraUrlSuffix()), true)?.data
+        
+        if(stream)
+        {
+            def bSize = stream.available()
+            byte[] imageArr = new byte[bSize]
+            stream.read(imageArr, 0, bSize)
+            def image = hubitat.helper.HexUtils.byteArrayToHexString(imageArr)
+            
+            sendEvent(name: "image", value: image)
+            
+            def encodedImage = imageArr.encodeBase64().toString()
+            def displayImage = '<img src="data:image/jpeg;base64,' + encodedImage + '">'
+            
+            sendEvent(name: "displayImage", value: displayImage)
+        }
+    }
+    catch (Exception e)
+    {
+        log.debug "take() failed: ${e.message}"
+    }
+}
+
+def clearImages()
+{
+    sendEvent(name: "image", value: "")
+    sendEvent(name: "displayImage", value: "")    
+}
+
+def getCameraUrlSuffix()
+{
+    def id = device.getDeviceNetworkId()?.split('-')?.getAt(0)
+    def baseUrlSuffix = "/proxy/protect/api/cameras/" + id + "/snapshot?force=true"
+    
+    return baseUrlSuffix
+}

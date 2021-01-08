@@ -1,0 +1,685 @@
+/*
+
+Copyright 2020 - tomw
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+-------------------------------------------
+
+Change history:
+
+1.0.0 - @tomw - Initial release
+
+*/
+
+import groovy.transform.Field
+
+metadata
+{
+    definition(name: "UniFi Protect Controller", namespace: "tomw", author: "tomw", importUrl: "")
+    {
+        capability "Initialize"
+        capability "Refresh"
+        
+        command "createChildDevices"
+        command "deleteChildDevices"
+        
+        attribute "commStatus", "string"
+    }
+}
+
+preferences
+{
+    section
+    {
+        input "controllerIP", "text", title: "UniFi controller IP", required: true
+        input "rpiIP", "text", title: "server.py IP", required: true
+        input "rpiPort", "text", title: "server.py port (typically 2112)", defaultValue: "2112", required: true
+    }
+    section
+    {
+        input "username", "text", title: "Username", required: true
+        input "password", "password", title: "Password", required: true
+    }
+    section
+    {
+        input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
+    }
+}
+
+def logDebug(msg) 
+{
+    if (logEnable)
+    {
+        log.debug(msg)
+    }
+}
+
+def updated()
+{
+    initialize()
+}
+
+def initialize()
+{
+    sendEvent(name: "commStatus", value: "unknown")
+    try
+    {
+        closeEventSocket()
+        
+        refreshCookie()
+        refresh()
+        
+        pyErrorCount = 0
+        runIn(5, openEventSocket)
+        
+        sendEvent(name: "commStatus", value: "good")
+    }
+    catch (Exception e)
+    {
+        logDebug("initialize() failed: ${e.message}")
+        sendEvent(name: "commStatus", value: "error")
+    }
+}
+
+def refresh()
+{
+    readBootstrap()
+}
+
+def genParamsAuth()
+{
+    def params =
+        [
+            uri: getBaseURI() + getLoginSuffix(),
+            headers:
+            [
+                'X-CSRF-Token': getCsrf(),
+                'Content-Type': "application/json"
+            ],
+            body: "{\"username\": \"${username}\", \"password\": \"${password}\"}",
+            ignoreSSLIssues: true
+        ]
+ 
+    return params
+}
+
+def genParamsMain(suffix, body = null)
+{
+    def params =
+        [
+            uri: getBaseURI() + suffix,
+            headers:
+            [
+                'Cookie': getCookie(),
+                'X-CSRF-Token': getCsrf()
+            ],
+            ignoreSSLIssues: true,
+        ]
+    
+    if(body)
+    {
+        params['body'] = body
+    }
+ 
+    return params
+}
+
+def genHeadersWss()
+{
+    def headers =
+        [
+            'Cookie': getCookie()
+        ]
+    
+    return headers
+}
+
+def getBaseURI()
+{
+    return "https://${controllerIP}"
+}
+
+def getLoginSuffix()
+{
+    return "/api/auth/login"
+}
+
+def getBootstrapSuffix()
+{
+    return "/proxy/protect/api/bootstrap"
+}
+
+def getWssURI(id)
+{
+    return "wss://${controllerIP}" + "/proxy/protect/ws/updates?" + "lastUpdateId=${id}";
+}
+
+def acquireToken()
+{
+    def resp = httpExec("GET", [uri: getBaseURI(), ignoreSSLIssues: true], true)
+    updateAuthTokensStore(resp)
+}
+
+def login()
+{
+    def resp = httpExec("POST", genParamsAuth(), true)
+    updateAuthTokensStore(resp)
+}
+
+def updateAuthTokensStore(resp)
+{
+    if(resp)
+    {
+        resp?.getHeaders()?.each
+        {
+            //logDebug("header: ${it.getName()} == ${it.getValue()}")
+            
+            if(it.getName()?.toString() == "X-CSRF-Token")
+            {
+                setCsrf(it.getValue())
+            }
+            
+            if(it.getName()?.toString() == "Set-Cookie")
+            {
+                setCookie(it.getValue()?.split(';')[0])
+            }
+        }
+    }
+}
+
+def refreshCookie()
+{
+    sendEvent(name: "commStatus", value: "unknown")
+    
+    try
+    {
+        acquireToken()
+        login()
+        
+        sendEvent(name: "commStatus", value: "good")
+    }
+    catch (Exception e)
+    {
+        logDebug("refreshCookie() failed: ${e.message}")
+        sendEvent(name: "commStatus", value: "error")
+        
+        throw(e)
+    }
+}
+
+def createChildDevices()
+{
+    if(getBootstrap()?.cameras)
+    {
+        getBootstrap().cameras.each
+        {
+            if((it.name && it.id) && !findChildDevice(it.id, "motion"))
+            {
+                createChildDevice(it.name, it.id, "motion")
+            }
+            
+            if((it.name && it.id) && !findChildDevice(it.id, "doorbell") && ("UVC G4 Doorbell" == it.type?.toString()))
+            {
+                // TODO: replace with more generic device type check
+                createChildDevice(it.name, it.id, "doorbell")
+            }
+        }
+    }
+}
+
+def deleteChildDevices()
+{
+    for(child in getChildDevices())
+    {
+        deleteChildDevice(child.deviceNetworkId)
+    }
+}
+
+def webSocketStatus(String message)
+{
+    logDebug("webSocketStatus: ${message}")
+}
+
+def openEventSocket()
+{
+    try
+    {
+        //logDebug("interfaces.webSocket.connect(${getWssURI(getBootstrap()?.lastUpdateId)}, headers: ${genHeadersWss()}, ignoreSSLIssues: true, perMessageDeflate: false)")
+        interfaces.webSocket.connect(getWssURI(getBootstrap()?.lastUpdateId), headers: genHeadersWss(), ignoreSSLIssues: true, perMessageDeflate: false)
+    }
+    catch (Exception e)
+    {
+        logDebug("error: ${e.message}")
+        sendEvent(name: "commStatus", value: "error")
+    }
+}
+
+def closeEventSocket()
+{
+    try
+    {
+        interfaces.webSocket.close()
+    }
+    catch (Exception e)
+    {
+        // swallow errors
+    }
+}
+
+def parse(String message)
+{
+    //logDebug("parse: ${message}")
+    
+    def packet = packetValidateAndDecode(message)    
+    
+    if(packet)
+    {
+        if(
+            packet.actionPacket?.actionPayload?.modelKey?.toString() == "camera" &&
+            packet.actionPacket?.actionPayload?.action?.toString() == "update"
+            )
+        {
+            def child
+            
+            child = findChildDevice(packet.actionPacket.actionPayload.id, "doorbell")
+            if(child)
+            {
+                switch(packet.dataPacket?.dataPayload?.lastRing)
+                {
+                    case null:
+                        break
+                    default:
+                        child.push(1)
+                }
+            }
+            
+            child = findChildDevice(packet.actionPacket.actionPayload.id, "motion")
+            if(child)
+            {
+                switch(packet.dataPacket?.dataPayload?.lastMotion)
+                {
+                    case null:
+                        child.motionInactive()
+                        break
+                    default:
+                        child.motionActive()
+                }
+            }
+        }
+    }
+}
+
+def childName(name, deviceType)
+{
+    return "${name.toString()}-${deviceType.toString()}"
+}
+
+def childDni(id, deviceType)
+{
+    return "${id.toString()}-${deviceType.toString()}"
+}
+
+def findChildDevice(id, deviceType)
+{
+    return getChildDevice(childDni(id, deviceType))
+}
+
+def createChildDevice(name, id, deviceType)
+{
+    def child
+    try
+    {
+        switch(deviceType.toString())
+        {
+            case "motion":
+                addChildDevice("UniFi Protect Camera", childDni(id, deviceType), [name: childName(name, deviceType), label: childName(name, deviceType), isComponent: false])
+                break
+            
+            case "doorbell":
+                addChildDevice("UniFi Protect Doorbell", childDni(id, deviceType), [name: childName(name, deviceType), label: childName(name, deviceType), isComponent: false])
+                break
+            
+            default:
+                logDebug("createChildDevice: deviceType not specified")
+        }
+    }
+    catch (Exception e)
+    {
+        logDebug("createChildDevice() failed: ${e.message}")
+    }
+}
+
+def setCookie(cookie)
+{
+    state.cookie = cookie
+}
+
+def getCookie()
+{
+    return state.cookie
+}
+
+def setCsrf(csrf)
+{
+    state.csrf = csrf
+}
+
+def getCsrf()
+{
+    return state.csrf
+}
+
+def readBootstrap()
+{
+    try
+    {
+        def resp = httpExecWithAuthCheck("GET", genParamsMain(getBootstrapSuffix()), true)
+        if(resp)
+        {
+            setBootstrap(resp?.data)
+        }
+        
+        sendEvent(name: "commStatus", value: "good")
+    }
+    catch (Exception e)
+    {
+        logDebug("readBootstrap() failed: ${e.message}")
+        sendEvent(name: "commStatus", value: "error")
+        
+        throw(e)
+    }
+}
+
+def setBootstrap(bootstrap)
+{
+    state.bootstrap = bootstrap
+}
+
+def getBootstrap()
+{
+    return state.bootstrap
+}
+
+def httpGetExec(params, throwToCaller = false)
+{
+    //logDebug("httpGetExec(${params})")
+    
+    try
+    {
+        def result
+        httpGet(params)
+        { resp ->
+            if (resp)
+            {
+                //logDebug("resp.data = ${resp.data}")
+                result = resp
+            }
+        }
+        return result
+    }
+    catch (Exception e)
+    {
+        logDebug("httpGetExec() failed: ${e.message}")
+        //logDebug("status = ${e.getResponse().getStatus().toInteger()}")
+        if(throwToCaller)
+        {
+            throw(e)
+        }
+    }
+}
+
+def httpPostExec(params, throwToCaller = false)
+{
+    //logDebug("httpPostExec(${params})")
+    
+    try
+    {
+        def result
+        httpPost(params)
+        { resp ->
+            if (resp)
+            {
+                //logDebug("resp.data = ${resp.data}")
+                result = resp
+            }
+        }
+        return result
+    }
+    catch (Exception e)
+    {
+        logDebug("httpPostExec() failed: ${e.message}")
+        //logDebug("status = ${e.getResponse().getStatus().toInteger()}")
+        if(throwToCaller)
+        {
+            throw(e)
+        }
+    }
+}
+
+def httpExec(operation, params, throwToCaller = false)
+{
+    def res
+    
+    switch(operation)
+    {
+        default:
+            logDebug("unsupported Http operation")
+        
+            if(throwToCaller)
+            {
+                throw new Exception("unsupported Http operation")
+            }
+            break
+        
+        case "POST":
+            res = httpPostExec(params, throwToCaller)
+            break
+        
+        case "GET":
+            res = httpGetExec(params, throwToCaller)
+            break
+    }
+    
+    return res
+}
+
+def httpExecWithAuthCheck(operation, params, throwToCaller = false)
+{
+    def res
+    try
+    {
+        res = httpExec(operation, params, true)                
+        return res
+    }
+    catch (Exception e)
+    {
+        if(e.getResponse().getStatus().toInteger() == 401)
+        {
+            // 401 Unauthorized
+            try
+            {
+                logDebug("httpExecWithAuthCheck() auth failed.  retrying...")
+                refreshCookie()                
+                
+                // update with new Auth token
+                params['headers']['Cookie'] = getCookie()
+                params['headers']['X-CSRF-Token'] = getCsrf()
+                
+                // workaround for bug?
+                if(null == params['ignoreSSLIssues'])
+                {
+                    params['ignoreSSLIssues']= true
+                }
+                
+                res = httpExec(operation, params, true)
+                return res
+            }
+            catch (Exception e2)
+            {
+                logDebug("httpExecWithAuthCheck() failed: ${e2.message}")
+                if(throwToCaller)
+                {
+                    throw(e2)
+                }
+            }
+        }
+        else
+        {
+            if(throwToCaller)
+            {
+                throw(e)
+            }
+        }
+    }
+}
+
+
+//
+// UniFi Protect packet handling and manipulation code
+//
+
+private subBytes(arr, start, length)
+{
+    return arr.toList().subList(start, start + length) as byte[]
+}
+
+private repackHeaderAsMap(header)
+{
+    def headerMap =
+        [
+            packetType: subBytes(header, 0, 1),
+            payloadFormat: subBytes(header, 1, 1),
+            deflated: subBytes(header, 2, 1),
+            payloadSize: hubitat.helper.HexUtils.hexStringToInt(hubitat.helper.HexUtils.byteArrayToHexString(subBytes(header, 4, 4)))
+        ]
+}
+
+@Field static Integer pyErrorCount = 0
+
+private packetValidateAndDecode(hexString)
+{
+    // all of this is based on the packet formats described here:  https://github.com/hjdhjd/homebridge-unifi-protect/blob/master/src/protect-api-updates.ts
+    
+    def actionHeader
+    def actionLength
+    def dataHeader
+    def dataLength
+    
+    def bytes
+    
+    //
+    // first, basic packet validation
+    //
+    
+    try
+    {
+        //logDebug("incoming message = ${hexString}")
+        bytes = hubitat.helper.HexUtils.hexStringToByteArray(hexString)
+        
+        actionHeader = subBytes(bytes, 0, 8)
+        actionLength = hubitat.helper.HexUtils.hexStringToInt(hubitat.helper.HexUtils.byteArrayToHexString(subBytes(actionHeader, 4, 4)))
+        dataHeader = subBytes(bytes, actionHeader.size() + actionLength, 8)
+        dataLength = hubitat.helper.HexUtils.hexStringToInt(hubitat.helper.HexUtils.byteArrayToHexString(subBytes(dataHeader, 4, 4)))
+        
+        def totalLength = actionHeader.size() + actionLength + dataHeader.size() + dataLength
+        
+        //logDebug("totalLength = ${totalLength}")
+        //logDebug("bytes.size() = ${bytes.size()}")
+        
+        if(totalLength != bytes.size())
+        {
+            throw new Exception("Header/Packet mismatch.")
+        }
+        
+        if(dataLength > 0x100)
+        {
+            // presumed status packet, which introduces processing overhead due to chattiness
+            return null
+        }
+    }
+    catch (Exception e)
+    {
+        logDebug("packet validation failed: ${e.message}")
+        // any error interpreted as fail
+        return null
+    }
+    
+    //
+    // then, decode and re-pack data
+    //
+    
+    try
+    {
+        def actionHeaderMap = repackHeaderAsMap(actionHeader)
+        def dataHeaderMap = repackHeaderAsMap(dataHeader)
+        
+        def actionPacket = hubitat.helper.HexUtils.byteArrayToHexString(subBytes(bytes, actionHeader.size(), actionHeaderMap.payloadSize))  
+        def dataPacket = hubitat.helper.HexUtils.byteArrayToHexString(subBytes(bytes, actionHeader.size() + actionLength + dataHeader.size(), dataHeaderMap.payloadSize))
+        
+        def slurper = new groovy.json.JsonSlurper()
+        
+        def actionJson = (actionHeaderMap.deflated ? decompress(actionPacket) : actionPacket)
+        def actionJsonMap = slurper.parseText(actionJson.toString())
+        
+        // pre-check whether this is a packet we want to further decode...
+        def isInterestingPacket =
+            (
+            actionJsonMap?.modelKey?.toString() == "camera" &&
+            actionJsonMap?.action?.toString() == "update"
+            )
+        
+        // ...if not, bail out to avoid unnecessary processing
+        def dataJson = isInterestingPacket ? (dataHeaderMap.deflated ? decompress(dataPacket) : dataPacket) : null
+        def dataJsonMap = isInterestingPacket ? (slurper.parseText(dataJson.toString())) : null
+        
+        def decodedPacket =
+            [
+                actionPacket: [actionHeader: actionHeaderMap, actionPayload: actionJsonMap],
+                dataPacket: [dataHeader: dataHeaderMap, dataPayload: dataJsonMap]
+            ]
+        
+        // reset our error count if we got this far
+        pyErrorCount = 0
+        
+        return decodedPacket
+    }
+    catch (ConnectException e)
+    {
+        // connection error -- assume that server.py is offline.
+        // give it up to 3 tries, then close event stream and alert user
+        pyErrorCount++
+        if(pyErrorCount >= 3)
+        {
+            closeEventSocket()
+            log.debug "Communication error with server.py.  Correct error and then run Initialize()."
+            sendEvent(name: "commStatus", value: "no events")
+        }            
+            
+        return null
+    } 
+    catch (Exception e)
+    {
+        logDebug("packet decoding failed: ${e.message}")
+        // any error interpreted as fail
+        return null
+    }
+}
+
+private decompress(s)
+{
+    // emulate zlib.decompress method
+    // bounces data off of server running server.py
+    
+    httpExec("POST", [uri: "http://${rpiIP}:${rpiPort}", body: s], true).data    
+}
