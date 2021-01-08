@@ -1,0 +1,35 @@
+  
+{
+  "packageName": "hubitat_unifiProtect",
+  "author": "tomw",
+  "version": "1.0.0",
+  "minimumHEVersion": "2.1.9",
+  "dateReleased": "2021-01-08",
+  "drivers": [
+    {
+      "id": "2a27425d-51fe-4c9b-89b3-d9dada9b09df",
+      "name": "UniFi Protect Controller",
+      "namespace": "tomw",
+      "location": "https://raw.githubusercontent.com/tomwpublic/hubitat_unifiProtect/main/unifiProtectController",
+      "required": true
+    },
+    {
+      "id": "13544119-363d-479b-8fdf-4a61bc682fc3",
+      "name": "UniFi Protect Camera",
+      "namespace": "tomw",
+      "location": "https://raw.githubusercontent.com/tomwpublic/hubitat_unifiProtect/main/unifiProtectCamera",
+      "required": true
+    },
+    {
+      "id": "d3a0bc6c-67c1-46fb-8dec-dca6915d701e",
+      "name": "UniFi Protect Doorbell",
+      "namespace": "tomw",
+      "location": "https://raw.githubusercontent.com/tomwpublic/hubitat_unifiProtect/main/unifiProtectDoorbell",
+      "required": true
+    },
+  ],
+  "licenseFile": "https://raw.githubusercontent.com/tomwpublic/hubitat_unifiProtect/main/LICENSE",
+  "releaseNotes": "1.0.0 - @tomw - Initial release.",
+  "documentationLink": "https://github.com/tomwpublic/hubitat_unifiProtect/blob/main/README.md",
+  "communityLink": "https://community.hubitat.com/u/tomw/summary"
+}
