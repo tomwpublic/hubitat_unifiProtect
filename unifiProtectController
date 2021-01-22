@@ -317,6 +317,21 @@ def parse(String message)
                 }
             }
         }
+        
+        if(
+            packet.actionPacket?.actionPayload?.modelKey?.toString() == "event" &&
+            packet.actionPacket?.actionPayload?.action?.toString() == "add"
+            )
+        {            
+            child = findChildDevice(packet.dataPacket?.dataPayload?.camera, "motion")
+            if(child)
+            {
+                if(!packet.dataPacket.dataPayload.smartDetectTypes?.isEmpty())
+                {
+                    child.smartDetectEvent(packet.dataPacket.dataPayload.smartDetectTypes)
+                }
+            }
+        }
     }
 }
 
@@ -635,8 +650,11 @@ private packetValidateAndDecode(hexString)
         // pre-check whether this is a packet we want to further decode...
         def isInterestingPacket =
             (
-            actionJsonMap?.modelKey?.toString() == "camera" &&
-            actionJsonMap?.action?.toString() == "update"
+            (actionJsonMap?.modelKey?.toString() == "camera" &&
+            actionJsonMap?.action?.toString() == "update")
+                ||
+            (actionJsonMap?.modelKey?.toString() == "event" &&
+            actionJsonMap?.action?.toString() == "add")                
             )
         
         // ...if not, bail out to avoid unnecessary processing
