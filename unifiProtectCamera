@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.1.0 - @tomw - Added Smart Detect support (for supported cameras only, must be configured in UniFi Protect controller)
 1.0.0 - @tomw - Initial release
 
 */
