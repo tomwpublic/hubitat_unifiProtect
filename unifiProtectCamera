@@ -35,12 +35,14 @@ metadata
         command "clearImages"
         
         attribute "displayImage", "string"
+        attribute "smartDetectType", "string"
     }
 }
 
 def installed()
 {
     sendEvent(name: "motion", value: "inactive")
+    sendEvent(name: "smartDetectType", value: "n/a")
 }
 
 def motionActive()
@@ -51,6 +53,13 @@ def motionActive()
 def motionInactive()
 {
     sendEvent(name: "motion", value: "inactive")
+}
+
+def smartDetectEvent(smartDetectTypes)
+{
+    sendEvent(name: "smartDetectType", value: smartDetectTypes[0], isStateChange: true)
+    pauseExecution(500)
+    sendEvent(name: "smartDetectType", value: "waiting", isStateChange: true)
 }
 
 def take()
