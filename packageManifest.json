@@ -2,7 +2,7 @@
 {
   "packageName": "hubitat_unifiProtect",
   "author": "tomw",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "minimumHEVersion": "2.1.9",
   "dateReleased": "2021-01-08",
   "drivers": [
@@ -29,7 +29,7 @@
     }
   ],
   "licenseFile": "https://raw.githubusercontent.com/tomwpublic/hubitat_unifiProtect/main/LICENSE",
-  "releaseNotes": "1.0.0 - @tomw - Initial release.",
+  "releaseNotes": "1.1.0 - @tomw - Added Smart Detect support (for supported cameras only, must be configured in UniFi Protect controller).\n1.0.0 - @tomw - Initial release.",
   "documentationLink": "https://github.com/tomwpublic/hubitat_unifiProtect/blob/main/README.md",
   "communityLink": "https://community.hubitat.com/t/ubiquiti-unifi-protect-cameras/17624/37"
 }
