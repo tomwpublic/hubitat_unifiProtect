@@ -1,6 +1,6 @@
 # hubitat_unifiProtect
 
-This provides various driver capabilities for Hubitat with UniFi Protect systems. Supported devices include cameras (Motion and ImageCapture capabilities) and doorbells (Motion and PushableButton capabilities).  More capabilities may be added over time.
+This provides various driver capabilities for Hubitat with UniFi Protect systems. Supported devices include cameras (Motion and ImageCapture capabilities, as well as Smart Detect for supported cameras) and doorbells (Motion, Notification (LCD screen message), and PushableButton capabilities).  More capabilities may be added over time.
 
 Note that this package requires a companion server that can run the python HTTP server script (server.py).  You can run this just about anywhere, including a Raspberry Pi or desktop PC.
 
@@ -29,6 +29,8 @@ Special thanks to @Bago for their troubleshooting help.
 * Use the ```take()``` command on camera devices to take a snapshot
     * A text attribute, ```displayImage``` will contain an HTML data URL to display the image on Dashboards.  A generic *Attribute* tile will render this for you.
     * Note that this may be a very large image, so if page loads or other performance suffers the ```clearImages()``` command can be used to flush the data
+* Use the ```deviceNotification()``` command on doorbell devices to print a message to the LCD screen
+    * Messages are limited to 30 characters by the UniFi system
 
 # Disclaimer
 
