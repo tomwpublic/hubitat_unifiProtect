@@ -131,6 +131,7 @@ def genParamsMain(suffix, body = null)
     if(body)
     {
         params['body'] = body
+        params['requestContentType'] = 'application/json'
     }
  
     return params
@@ -483,6 +484,34 @@ def httpPostExec(params, throwToCaller = false)
     }
 }
 
+def httpPatchExec(params, throwToCaller = false)
+{
+    //logDebug("httpPatchExec(${params})")
+    
+    try
+    {
+        def result
+        httpPatch(params)
+        { resp ->
+            if (resp)
+            {
+                //logDebug("resp.data = ${resp.data}")
+                result = resp
+            }
+        }
+        return result
+    }
+    catch (Exception e)
+    {
+        logDebug("httpPatchExec() failed: ${e.message}")
+        //logDebug("status = ${e.getResponse().getStatus().toInteger()}")
+        if(throwToCaller)
+        {
+            throw(e)
+        }
+    }
+}
+
 def httpExec(operation, params, throwToCaller = false)
 {
     def res
@@ -504,6 +533,10 @@ def httpExec(operation, params, throwToCaller = false)
         
         case "GET":
             res = httpGetExec(params, throwToCaller)
+            break
+        
+        case "PATCH":
+            res = httpPatchExec(params, throwToCaller)
             break
     }
     
