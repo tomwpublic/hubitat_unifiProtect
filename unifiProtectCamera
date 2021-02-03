@@ -92,8 +92,8 @@ def take()
 
 def clearImages()
 {
-    sendEvent(name: "image", value: "")
-    sendEvent(name: "displayImage", value: "")    
+    sendEvent(name: "image", value: "n/a")
+    sendEvent(name: "displayImage", value: "n/a")   
 }
 
 def getCameraUrlSuffix()
