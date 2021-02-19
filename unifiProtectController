@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.2.1 - @tomw - Improvements for websocket uptime
 1.2.0 - @tomw - Added doorbell LCD message support
 1.1.0 - @tomw - Added Smart Detect support (for supported cameras only, must be configured in UniFi Protect controller)
 1.0.0 - @tomw - Initial release
@@ -77,6 +78,7 @@ def initialize()
     sendEvent(name: "commStatus", value: "unknown")
     try
     {
+        unschedule()
         closeEventSocket()
         
         refreshCookie()
@@ -196,6 +198,14 @@ def updateAuthTokensStore(resp)
             if(it.getName()?.toString() == "Set-Cookie")
             {
                 setCookie(it.getValue()?.split(';')[0])
+                
+                // extract the expiration time from the cookie
+                def rawToken = it.getValue()?.split('=')[1]
+                setExpir(new groovy.json.JsonSlurper().parseText(new String(rawToken?.tokenize(".")?.getAt(1)?.decodeBase64()))?.exp)
+                
+                // schedule next refreshCookie 10 minutes before expiration
+                def now = ((new Date().getTime()) / 1000).toInteger()
+                runIn((getExpir() - now) - (60 * 10), initialize)
             }
         }
     }
@@ -386,6 +396,16 @@ def setCookie(cookie)
 def getCookie()
 {
     return state.cookie
+}
+
+def setExpir(expir)
+{
+    state.expir = expir
+}
+
+def getExpir()
+{
+    return state.expir
 }
 
 def setCsrf(csrf)
