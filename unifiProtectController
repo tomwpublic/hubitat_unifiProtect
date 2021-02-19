@@ -18,7 +18,7 @@ limitations under the License.
 
 Change history:
 
-1.2.1 - @tomw - Improvements for websocket uptime
+1.2.2 - @tomw - Improvements for websocket uptime
 1.2.0 - @tomw - Added doorbell LCD message support
 1.1.0 - @tomw - Added Smart Detect support (for supported cameras only, must be configured in UniFi Protect controller)
 1.0.0 - @tomw - Initial release
