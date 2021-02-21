@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.2.2 - @tomw - Improvements for websocket uptime
 1.2.0 - @tomw - Added doorbell LCD message support
 1.1.0 - @tomw - Added Smart Detect support (for supported cameras only, must be configured in UniFi Protect controller)
 1.0.0 - @tomw - Initial release
@@ -77,6 +78,7 @@ def initialize()
     sendEvent(name: "commStatus", value: "unknown")
     try
     {
+        unschedule()
         closeEventSocket()
         
         refreshCookie()
@@ -196,6 +198,14 @@ def updateAuthTokensStore(resp)
             if(it.getName()?.toString() == "Set-Cookie")
             {
                 setCookie(it.getValue()?.split(';')[0])
+                
+                // extract the expiration time from the cookie
+                def rawToken = it.getValue()?.split('=')[1]
+                setExpir(new groovy.json.JsonSlurper().parseText(new String(rawToken?.tokenize(".")?.getAt(1)?.decodeBase64()))?.exp)
+                
+                // schedule next refreshCookie 10 minutes before expiration
+                def now = ((new Date().getTime()) / 1000).toInteger()
+                runIn((getExpir() - now) - (60 * 10), reinitialize)
             }
         }
     }
@@ -252,6 +262,50 @@ def deleteChildDevices()
 def webSocketStatus(String message)
 {
     logDebug("webSocketStatus: ${message}")
+    
+    // thanks for the idea: https://community.hubitat.com/t/websocket-client/11843/15
+    if(message.startsWith("status: open"))
+    {        
+        sendEvent(name: "commStatus", value: "good")
+        
+        state.reconnectDelay = 1
+        state.wasExpectedClose = false
+        
+        return
+    }
+    else if(message.startsWith("status: closing"))
+    {
+        sendEvent(name: "commStatus", value: "no events")
+        if(state.wasExpectedClose)
+        {
+            state.wasExpectedClose = false
+            return
+        }
+        
+        reinitialize()
+        
+        return
+    }
+    else if(message.startsWith("failure:"))
+    {
+        sendEvent(name: "commStatus", value: "error")        
+        reinitialize()
+        
+        return
+    }
+}
+
+def reinitialize()
+{
+    // thanks @ogiewon for the example
+    
+    // first delay is 2 seconds, doubles every time
+    def delayCalc = (state.reconnectDelay ?: 1) * 2    
+    // upper limit is 600s
+    def reconnectDelay = delayCalc <= 600 ? delayCalc : 600
+    
+    state.reconnectDelay = reconnectDelay
+    runIn(reconnectDelay, initialize)
 }
 
 def openEventSocket()
@@ -273,6 +327,10 @@ def closeEventSocket()
     try
     {
         interfaces.webSocket.close()
+        state.wasExpectedClose = true
+        
+        // wait for state to catch up
+        pauseExecution(500)
     }
     catch (Exception e)
     {
@@ -386,6 +444,16 @@ def setCookie(cookie)
 def getCookie()
 {
     return state.cookie
+}
+
+def setExpir(expir)
+{
+    state.expir = expir
+}
+
+def getExpir()
+{
+    return state.expir
 }
 
 def setCsrf(csrf)
