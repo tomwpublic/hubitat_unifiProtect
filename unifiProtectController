@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.2.3 - @tomw - Bugfixes for websocket error handling
 1.2.2 - @tomw - Improvements for websocket uptime
 1.2.0 - @tomw - Added doorbell LCD message support
 1.1.0 - @tomw - Added Smart Detect support (for supported cameras only, must be configured in UniFi Protect controller)
@@ -269,16 +270,16 @@ def webSocketStatus(String message)
         sendEvent(name: "commStatus", value: "good")
         
         state.reconnectDelay = 1
-        state.wasExpectedClose = false
+        setWasExpectedClose(false)
         
         return
     }
     else if(message.startsWith("status: closing"))
     {
         sendEvent(name: "commStatus", value: "no events")
-        if(state.wasExpectedClose)
+        if(getWasExpectedClose())
         {
-            state.wasExpectedClose = false
+            setWasExpectedClose(false)
             return
         }
         
@@ -326,11 +327,11 @@ def closeEventSocket()
 {
     try
     {
-        interfaces.webSocket.close()
-        state.wasExpectedClose = true
-        
+        setWasExpectedClose(true)
         // wait for state to catch up
         pauseExecution(500)
+        
+        interfaces.webSocket.close()
     }
     catch (Exception e)
     {
@@ -464,6 +465,16 @@ def setCsrf(csrf)
 def getCsrf()
 {
     return state.csrf
+}
+
+def setWasExpectedClose(wasExpected)
+{
+    state.wasExpectedClose = wasExpected
+}
+
+def getWasExpectedClose()
+{
+    return state.wasExpectedClose
 }
 
 def readBootstrap()
