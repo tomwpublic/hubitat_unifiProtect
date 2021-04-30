@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.2.4 - @tomw - Improved recovery behavior when Initialize fails.  Reduced State storage usage.
 1.2.3 - @tomw - Bugfixes for websocket error handling
 1.2.2 - @tomw - Improvements for websocket uptime
 1.2.0 - @tomw - Added doorbell LCD message support
@@ -94,6 +95,8 @@ def initialize()
     {
         logDebug("initialize() failed: ${e.message}")
         sendEvent(name: "commStatus", value: "error")
+        
+        reinitialize()
     }
 }
 
@@ -484,7 +487,10 @@ def readBootstrap()
         def resp = httpExecWithAuthCheck("GET", genParamsMain(getBootstrapSuffix()), true)
         if(resp)
         {
-            setBootstrap(resp?.data)
+            // only save the parts that we actually use
+            def subBootstrap = [cameras: resp.data.cameras, lastUpdateId: resp.data.lastUpdateId]
+            
+            setBootstrap(subBootstrap)
         }
         
         sendEvent(name: "commStatus", value: "good")
