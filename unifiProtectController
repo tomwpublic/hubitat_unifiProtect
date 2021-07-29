@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.3.0 - @tomw - Local processing for events.  No server.py required with Hubitat 2.2.8.143 and later
 1.2.4 - @tomw - Improved recovery behavior when Initialize fails.  Reduced State storage usage.
 1.2.3 - @tomw - Bugfixes for websocket error handling
 1.2.2 - @tomw - Improvements for websocket uptime
@@ -814,10 +815,68 @@ private packetValidateAndDecode(hexString)
     }
 }
 
+def checkForMinVers(vers)
+{
+    def splitTestVers = vers?.tokenize('.')
+    def splitCurVers = getLocation()?.getHub()?.firmwareVersionString?.tokenize('.')
+    
+    if(splitTestVers.size() != splitCurVers.size())
+    {
+        // something is wrong, so bail
+        return false
+    }
+    
+    def testVers = (splitTestVers.collect { String.format( "%04d", it.toInteger() ) })?.join()
+    def curVers = (splitCurVers.collect { String.format( "%04d", it.toInteger() ) })?.join()
+    
+    return (curVers >= testVers)
+}
+
 private decompress(s)
+{
+    if(checkForMinVers("2.2.8.143"))
+    {
+        decompressLocal(s)
+    }
+    else
+    {
+        decompressRemote(s)
+    }
+}
+
+private decompressRemote(s)
 {
     // emulate zlib.decompress method
     // bounces data off of server running server.py
     
-    httpExec("POST", [uri: "http://${rpiIP}:${rpiPort}", body: s], true).data    
+    return httpExec("POST", [uri: "http://${rpiIP}:${rpiPort}", body: s], true)?.data
+}
+
+import java.io.ByteArrayOutputStream
+import java.util.zip.Inflater
+
+private decompressLocal(s)
+{
+    // based on this example: https://dzone.com/articles/how-compress-and-uncompress    
+    def sBytes = hubitat.helper.HexUtils.hexStringToByteArray(s)
+    
+    Inflater inflater = new Inflater() 
+    inflater.setInput(sBytes)
+    
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream(sBytes.length)
+    
+    byte[] buffer = new byte[1024]
+    
+    while(!inflater.finished())
+    {  
+        int count = inflater.inflate(buffer)
+        outputStream.write(buffer, 0, count)
+    }
+    
+    outputStream.close()
+    
+    def resp = new String(outputStream.toByteArray())    
+    //logDebug("decompressLocal resp = ${resp}")
+    
+    return resp
 }
