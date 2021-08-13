@@ -1,0 +1,111 @@
+/*
+
+ */
+
+definition(
+    name: "Image Server",
+    namespace: "tomw",
+    author: "tomw",
+    description: "",
+    category: "Convenience",
+    iconUrl: "",
+    iconX2Url: "",
+    iconX3Url: "")
+
+preferences
+{
+    page(name: "mainPage1")
+    page(name: "mainPage2")
+    page(name: "mainPage3")
+}
+
+def mainPage1()
+{
+    dynamicPage(name: "mainPage1", title: "", nextPage: "mainPage2", install: false, uninstall: true)
+    {
+        section
+        {
+            input name:	"sourceDevs", type: "capability.*", title: "Select any devices with the 'image' attribute.", multiple: true, required: true
+        }
+        section
+        {
+            input name:	"enableLogging", type: "bool", title: "Enable Debug Logging?", defaultValue: false, required: true
+        }
+    }
+}
+
+def mainPage2()
+{
+    def token = getToken()
+    
+    dynamicPage(name: "mainPage2", title: "", nextPage: "mainPage3", install: true, uninstall: true)
+    {
+        section
+        {
+            for(dev in sourceDevs)
+            {
+                paragraph("<b>${dev.getName()}:</b>")
+                paragraph("<p style='margin-left:10%'>${getFullLocalApiServerUrl() + "/${imagePath}/${dev.getDeviceNetworkId()}?access_token=${token}"}</p>")
+            }
+        }
+    }
+}
+
+def logDebug(msg)
+{
+    if(enableLogging)
+    {
+        log.debug "${msg}"
+    }
+}
+
+def getToken()
+{
+    if(!state.accessToken)
+    {
+        createAccessToken()
+    }
+    
+    return state.accessToken
+}
+
+import groovy.transform.Field
+@Field String imagePath = "image"
+
+mappings
+{
+    path("/${imagePath}/:devDni")
+    {
+        action:
+            [
+                GET: "serveImage"
+            ]
+    }
+}
+
+def serveImage()
+{
+    def reqDev = params.devDni
+    
+    logDebug("Image Server request for ${reqDev}")
+    
+    for(dev in sourceDevs)
+    {
+        if(reqDev == dev.getDeviceNetworkId())
+        {
+            if(null == dev.currentValue('image'))
+            {
+                // device attribute missing, so bail
+                break
+            }
+            
+            logDebug("Image Server matched ${dev.getName()}")
+            
+            // this assumes 'image' is a hex string of the raw bytestream of a jpeg image
+            def encodedImage = hubitat.helper.HexUtils.hexStringToByteArray(dev.currentValue('image'))
+            return render(contentType: "image/jpeg;base64", data: encodedImage, status: 200)       
+        }
+    }
+    
+    return render(contentType: "text/html", data: "Image Server: unknown device", status: 200) 
+}
