@@ -46,6 +46,7 @@ def mainPage2()
             {
                 paragraph("<b>${dev.getName()}:</b>")
                 paragraph("<p style='margin-left:10%'>${getFullLocalApiServerUrl() + "/${imagePath}/${dev.getDeviceNetworkId()}?access_token=${token}"}</p>")
+                paragraph("<p style='margin-left:10%'>${getFullApiServerUrl() + "/${imagePath}/${dev.getDeviceNetworkId()}?access_token=${token}"}</p>")
             }
         }
     }
@@ -89,23 +90,45 @@ def serveImage()
     
     logDebug("Image Server request for ${reqDev}")
     
-    for(dev in sourceDevs)
+    try
     {
-        if(reqDev == dev.getDeviceNetworkId())
+        for(dev in sourceDevs)
         {
-            if(null == dev.currentValue('image'))
+            if(reqDev == dev.getDeviceNetworkId())
             {
-                // device attribute missing, so bail
-                break
+                if(null == dev.currentValue('image'))
+                {
+                    throw new Exception("no image attribute present")
+                }
+            
+                logDebug("Image Server matched ${dev.getName()}")
+            
+                def encodedImage
+                
+                def width = dev.currentValue('snapWidth')
+                def height = dev.currentValue('snapHeight')
+            
+                switch(params.format)
+                {
+                    case "svg+xml":
+                    default:
+                        encodedImage = "data:image/jpeg;base64," + hubitat.helper.HexUtils.hexStringToByteArray(dev.currentValue('image')).encodeBase64().toString()
+                        return render(contentType: "image/svg+xml", 
+                                      data: "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" " + 
+                                      "height=\"${height}\" width=\"${width}\"><image width=\"${width}\" height=\"${height}\" xlink:href=\"${encodedImage}\"/></svg>",
+                                      status: 200)
+                
+                    case "jpeg":
+                        encodedImage = hubitat.helper.HexUtils.hexStringToByteArray(dev.currentValue('image'))
+                        return render(contentType: "image/jpeg;base64", data: encodedImage, status: 200)
+                }
             }
-            
-            logDebug("Image Server matched ${dev.getName()}")
-            
-            // this assumes 'image' is a hex string of the raw bytestream of a jpeg image
-            def encodedImage = hubitat.helper.HexUtils.hexStringToByteArray(dev.currentValue('image'))
-            return render(contentType: "image/jpeg;base64", data: encodedImage, status: 200)       
         }
+        
+        throw new Exception("no matching device")
     }
-    
-    return render(contentType: "text/html", data: "Image Server: unknown device", status: 200) 
+    catch (Exception e)
+    {
+        return render(contentType: "text/html", data: "Image Server: ${e.message}", status: 200) 
+    }
 }
