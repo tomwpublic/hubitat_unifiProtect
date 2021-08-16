@@ -16,7 +16,6 @@ preferences
 {
     page(name: "mainPage1")
     page(name: "mainPage2")
-    page(name: "mainPage3")
 }
 
 def mainPage1()
@@ -38,7 +37,7 @@ def mainPage2()
 {
     def token = getToken()
     
-    dynamicPage(name: "mainPage2", title: "", nextPage: "mainPage3", install: true, uninstall: true)
+    dynamicPage(name: "mainPage2", title: "", install: true, uninstall: true)
     {
         section
         {
