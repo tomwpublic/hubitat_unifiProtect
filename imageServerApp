@@ -105,8 +105,8 @@ def serveImage()
             
                 def encodedImage
                 
-                def width = dev.currentValue('snapWidth')
-                def height = dev.currentValue('snapHeight')
+                def width = dev.currentValue('snapWidth') ?: 640
+                def height = dev.currentValue('snapHeight') ?: 360
             
                 switch(params.format)
                 {
