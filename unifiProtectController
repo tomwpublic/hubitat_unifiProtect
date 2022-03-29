@@ -18,14 +18,15 @@ limitations under the License.
 
 Change history:
 
-1.3.1 - @tomw - Hide unused server.py preferences for IP/port
-1.3.0 - @tomw - Local processing for events.  No server.py required with Hubitat 2.2.8.143 and later
-1.2.4 - @tomw - Improved recovery behavior when Initialize fails.  Reduced State storage usage.
-1.2.3 - @tomw - Bugfixes for websocket error handling
-1.2.2 - @tomw - Improvements for websocket uptime
-1.2.0 - @tomw - Added doorbell LCD message support
-1.1.0 - @tomw - Added Smart Detect support (for supported cameras only, must be configured in UniFi Protect controller)
-1.0.0 - @tomw - Initial release
+1.3.2 - tomw - Bugfix in login flow
+1.3.1 - tomw - Hide unused server.py preferences for IP/port
+1.3.0 - tomw - Local processing for events.  No server.py required with Hubitat 2.2.8.143 and later
+1.2.4 - tomw - Improved recovery behavior when Initialize fails.  Reduced State storage usage.
+1.2.3 - tomw - Bugfixes for websocket error handling
+1.2.2 - tomw - Improvements for websocket uptime
+1.2.0 - tomw - Added doorbell LCD message support
+1.1.0 - tomw - Added Smart Detect support (for supported cameras only, must be configured in UniFi Protect controller)
+1.0.0 - tomw - Initial release
 
 */
 
@@ -117,9 +118,11 @@ def genParamsAuth()
             uri: getBaseURI() + getLoginSuffix(),
             headers:
             [
-                'X-CSRF-Token': getCsrf(),
-                'Content-Type': "application/json"
+                'X-CSRF-Token': getCsrf()
             ],
+            
+            contentType: "application/json",
+            requestContentType: "application/json",
             body: "{\"username\": \"${username}\", \"password\": \"${password}\"}",
             ignoreSSLIssues: true
         ]
@@ -143,6 +146,7 @@ def genParamsMain(suffix, body = null)
     if(body)
     {
         params['body'] = body
+        params['contentType'] = 'application/json'
         params['requestContentType'] = 'application/json'
     }
  
@@ -179,15 +183,11 @@ def getWssURI(id)
     return "wss://${controllerIP}" + "/proxy/protect/ws/updates?" + "lastUpdateId=${id}";
 }
 
-def acquireToken()
-{
-    def resp = httpExec("GET", [uri: getBaseURI(), ignoreSSLIssues: true], true)
-    updateAuthTokensStore(resp)
-}
-
 def login()
 {
     def resp = httpExec("POST", genParamsAuth(), true)
+    //logDebug("login = ${resp.data}")
+    
     updateAuthTokensStore(resp)
 }
 
@@ -210,7 +210,11 @@ def updateAuthTokensStore(resp)
                 
                 // extract the expiration time from the cookie
                 def rawToken = it.getValue()?.split('=')[1]
-                setExpir(new groovy.json.JsonSlurper().parseText(new String(rawToken?.tokenize(".")?.getAt(1)?.decodeBase64()))?.exp)
+                
+                //setExpir(new groovy.json.JsonSlurper().parseText(new String(rawToken?.tokenize(".")?.getAt(1)?.decodeBase64()))?.exp)
+                // Use `iat` instead, because some newer UniFi OS JWT reponses don't seen to have `exp`.
+                //  Assumption is that the token is valid for 60 minutes.
+                setExpir(new groovy.json.JsonSlurper().parseText(new String(rawToken?.tokenize(".")?.getAt(1)?.decodeBase64()))?.iat + (60 * 60))
                 
                 // schedule next refreshCookie 10 minutes before expiration
                 def now = ((new Date().getTime()) / 1000).toInteger()
@@ -226,7 +230,6 @@ def refreshCookie()
     
     try
     {
-        acquireToken()
         login()
         
         sendEvent(name: "commStatus", value: "good")
