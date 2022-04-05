@@ -30,6 +30,7 @@ Special thanks to @Bago for their troubleshooting help.
 * Use the ```take()``` command on camera devices to take a snapshot
     * A text attribute, ```displayImage``` will contain an HTML data URL to display the image on Dashboards.  A generic *Attribute* tile will render this for you.
     * Note that this may be a very large image, so if page loads or other performance suffers the ```clearImages()``` command can be used to flush the data
+* Use the ```setRecordingMode(mode)``` on camera devices to modify the recording mode.  Supported modes: always, motion, and never 
 * Use the ```deviceNotification()``` command on doorbell devices to print a message to the LCD screen
     * Messages are limited to 30 characters by the UniFi Protect system
 
