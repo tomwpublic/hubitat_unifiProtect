@@ -63,15 +63,12 @@ def installed()
     device.updateSetting("snapHeight", 360)
 }
 
-def processEvent(event)
+def processEvent(event, scrubStaleAttrs = false)
 {
     if(!event)
     {
         return
     }
-    
-    // if we have a motion event, register it.  otherwise, assume no motion.
-    (null != event.lastMotion) ? motionActive() : motionInactive()
     
     if(null != event.isDark)
     {
@@ -82,6 +79,15 @@ def processEvent(event)
     {
         smartDetectEvent(event.smartDetectTypes)
     }
+    
+    if(scrubStaleAttrs)
+    {
+        // don't process remaining event contents
+        return
+    }
+    
+    // if we have a motion event, register it.  otherwise, assume no motion.
+    sendEvent(name: "motion", value: event.lastMotion ? "active" : "inactive")
 }
 
 def motionActive()
