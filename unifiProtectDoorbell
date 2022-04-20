@@ -43,10 +43,21 @@ def installed()
     sendEvent(name: "numberOfButtons", value: 1)
 }
 
-def processEvent(event)
+def processEvent(event, scrubStaleAttrs = false)
 {
     if(!event)
     {
+        return
+    }
+    
+    if(null != event.isDark)
+    {
+        sendEvent(name: "isDark", value: event.isDark)        
+    }
+    
+    if(scrubStaleAttrs)
+    {
+        // don't process remaining event contents
         return
     }
     
@@ -54,11 +65,6 @@ def processEvent(event)
     if(null != event.lastRing)
     {
         push(1)
-    }
-    
-    if(null != event.isDark)
-    {
-        sendEvent(name: "isDark", value: event.isDark)        
     }
 }
 
