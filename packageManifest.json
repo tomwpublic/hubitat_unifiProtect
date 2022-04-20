@@ -31,7 +31,7 @@
       "id": "edfa53bc-fe44-431a-aa75-1eda1620b80c",
       "name": "UniFi Protect Light",
       "namespace": "tomw",
-      "location": "https://raw.githubusercontent.com/tomwpublic/hubitat_unifiProtect/main/unifiProtectDoorbell",
+      "location": "https://raw.githubusercontent.com/tomwpublic/hubitat_unifiProtect/main/unifiProtectLight",
       "required": true
     }
   ],
