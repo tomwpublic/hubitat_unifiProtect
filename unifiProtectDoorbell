@@ -18,8 +18,9 @@ limitations under the License.
 
 Change history:
 
-1.2.0 - @tomw - Added doorbell LCD message support
-1.0.0 - @tomw - Initial release
+1.3.4 - tomw - Added light support and "isDark" attribute on cameras and lights
+1.2.0 - tomw - Added doorbell LCD message support
+1.0.0 - tomw - Initial release
 
 */
 
@@ -32,12 +33,33 @@ metadata
         
         command "push", ["number"]
         command "clearNotification"
+        
+        attribute "isDark", "enum", [true, false]
     }
 }
 
 def installed()
 {
     sendEvent(name: "numberOfButtons", value: 1)
+}
+
+def processEvent(event)
+{
+    if(!event)
+    {
+        return
+    }
+    
+    // if we have a button push event, register it
+    if(null != event.lastRing)
+    {
+        push(1)
+    }
+    
+    if(null != event.isDark)
+    {
+        sendEvent(name: "isDark", value: event.isDark)        
+    }
 }
 
 def push()
@@ -52,25 +74,23 @@ def push(number)
 
 def deviceNotification(text)
 {
-    try
-    {
-        getParent()?.httpExecWithAuthCheck("PATCH", parent?.genParamsMain(getDoorbellUrlSuffix(), new groovy.json.JsonOutput().toJson([lcdMessage: [type: "CUSTOM_MESSAGE", text: text, resetAt: null]])), true)
-    }
-    catch (Exception e)
-    {
-        log.debug "deviceNotification() failed: ${e.message}"
-    }
+    updateDoorbell([lcdMessage: [type: "CUSTOM_MESSAGE", text: text, resetAt: null]])
 }
 
 def clearNotification()
 {
+    updateDoorbell([lcdMessage: [resetAt: 0]])
+}
+
+def updateDoorbell(dataMap)
+{
     try
     {
-        getParent()?.httpExecWithAuthCheck("PATCH", parent?.genParamsMain(getDoorbellUrlSuffix(), new groovy.json.JsonOutput().toJson([lcdMessage: [resetAt: 0]])), true)
+        getParent()?.httpExecWithAuthCheck("PATCH", parent?.genParamsMain(getDoorbellUrlSuffix(), new groovy.json.JsonOutput().toJson(dataMap)), true)
     }
     catch (Exception e)
     {
-        log.debug "clearNotification() failed: ${e.message}"
+        log.debug "updateDoorbell(${dataMap}) failed: ${e.message}"
     }
 }
 
