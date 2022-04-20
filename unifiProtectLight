@@ -34,14 +34,12 @@ metadata
     }
 }
 
-def processEvent(event)
+def processEvent(event, scrubStaleAttrs = false)
 {
     if(!event)
     {
         return
     }
-    
-    sendEvent(name: "motion", value: event.lastMotion ? "active" : "inactive")
     
     if(null != event.isLightOn)
     {
@@ -57,6 +55,15 @@ def processEvent(event)
     {
         sendEvent(name: "isDark", value: event.isDark)        
     }
+    
+    if(scrubStaleAttrs)
+    {
+        // don't process remaining event contents
+        return
+    }
+    
+    // if we have a motion event, register it.  otherwise, assume no motion.
+    sendEvent(name: "motion", value: event.lastMotion ? "active" : "inactive")
 }
 
 private brightToPercent(bright)
