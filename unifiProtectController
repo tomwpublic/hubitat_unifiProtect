@@ -18,7 +18,7 @@ limitations under the License.
 
 Change history:
 
-1.3.4 (dev) - tomw - Added light support and "isDark" attribute on cameras and lights
+1.3.4 - tomw - Added light support and "isDark" attribute on cameras and lights
 1.3.3 - tomw - Bugfix in login flow
 1.3.1 - tomw - Hide unused server.py preferences for IP/port
 1.3.0 - tomw - Local processing for events.  No server.py required with Hubitat 2.2.8.143 and later
