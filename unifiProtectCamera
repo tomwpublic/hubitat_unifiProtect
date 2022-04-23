@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.3.4 - tomw - Added light support and "isDark" attribute on cameras and lights
 1.3.2 - tomw - Added command for setting recording mode.  Supported values are always/motion/never.
 1.2.1 - tomw - Added configurable snapshot size.  Default size is 640 x 360.
 1.1.0 - tomw - Added Smart Detect support (for supported cameras only, must be configured in UniFi Protect controller)
@@ -39,6 +40,7 @@ metadata
         command "setRecordingMode", ["mode"]
         
         attribute "displayImage", "string"
+        attribute "isDark", "enum", [true, false]
         attribute "smartDetectType", "string"
     }
 }
@@ -61,6 +63,33 @@ def installed()
     device.updateSetting("snapHeight", 360)
 }
 
+def processEvent(event, scrubStaleAttrs = false)
+{
+    if(!event)
+    {
+        return
+    }
+    
+    if(null != event.isDark)
+    {
+        sendEvent(name: "isDark", value: event.isDark)        
+    }
+    
+    if(!event.smartDetectTypes?.isEmpty() && (null != event.smartDetectTypes))
+    {
+        smartDetectEvent(event.smartDetectTypes)
+    }
+    
+    if(scrubStaleAttrs)
+    {
+        // don't process remaining event contents
+        return
+    }
+    
+    // if we have a motion event, register it.  otherwise, assume no motion.
+    sendEvent(name: "motion", value: event.lastMotion ? "active" : "inactive")
+}
+
 def motionActive()
 {
     sendEvent(name: "motion", value: "active")
@@ -73,7 +102,11 @@ def motionInactive()
 
 def smartDetectEvent(smartDetectTypes)
 {
-    sendEvent(name: "smartDetectType", value: smartDetectTypes[0], isStateChange: true)
+    smartDetectTypes.each
+    {
+        sendEvent(name: "smartDetectType", value: it, isStateChange: true)
+    }
+    
     pauseExecution(500)
     sendEvent(name: "smartDetectType", value: "waiting", isStateChange: true)
 }
