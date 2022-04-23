@@ -1,6 +1,6 @@
 # hubitat_unifiProtect
 
-This provides various driver capabilities for Hubitat with UniFi Protect systems. Supported devices include cameras (Motion and ImageCapture capabilities, as well as Smart Detect for supported cameras) and doorbells (Motion, Notification (LCD screen message), and PushableButton capabilities).  More capabilities may be added over time.
+This provides various driver capabilities for Hubitat with UniFi Protect systems. Supported devices include cameras (Motion and ImageCapture capabilities, as well as Smart Detect for supported cameras), doorbells (Motion, Notification (LCD screen message), and lights (Motion, Switch, and SwitchLevel), and PushableButton capabilities).  More capabilities may be added over time.
 
 **Update (July 2021):** The companion server and server.py are no longer required if you are running Hubitat platform version 2.2.8.143 or later and version 1.3.0 or later of this integration.  Please update to those versions for the best user experience.  **Previous info:** Note that this package requires a companion server that can run the python HTTP server script (server.py).  You can run this just about anywhere, including a Raspberry Pi or desktop PC.
 
@@ -26,7 +26,8 @@ Special thanks to @Bago for their troubleshooting help.
 # Usage instructions:
 
 * Use ```createChildDevices()``` to create specific instances for all known devices (from the 'bootstrap' *Device States* entry)
-* Utilize Motion (from cameras and doorbells) and PushableButton (from doorbell) events, according to whatever is supported by your devices
+* Utilize Motion (from cameras, doorbells, and lights) and PushableButton (from doorbell) events, according to whatever is supported by your devices
+* Use ```on()```, ```off()```, and ```setLevel()``` on lights
 * Use the ```take()``` command on camera devices to take a snapshot
     * A text attribute, ```displayImage``` will contain an HTML data URL to display the image on Dashboards.  A generic *Attribute* tile will render this for you.
     * Note that this may be a very large image, so if page loads or other performance suffers the ```clearImages()``` command can be used to flush the data
