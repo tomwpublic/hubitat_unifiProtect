@@ -18,7 +18,7 @@ limitations under the License.
 
 Change history:
 
-1.3.6 - tomw - Improved event handling for motion and smart detect events
+1.3.6 - tomw - Improved event handling
 1.3.4 - tomw - Added light support and "isDark" attribute on cameras and lights
 1.3.2 - tomw - Added command for setting recording mode.  Supported values are always/motion/never.
 1.2.1 - tomw - Added configurable snapshot size.  Default size is 640 x 360.
@@ -64,7 +64,7 @@ def installed()
     device.updateSetting("snapHeight", 360)
 }
 
-def processEvent(event, scrubStaleAttrs = false)
+def processEvent(event)
 {
     if(!event)
     {
@@ -99,14 +99,6 @@ def processEvent(event, scrubStaleAttrs = false)
             smartDetectEvent(null)
         }
     }
-    
-    if(scrubStaleAttrs)
-    {
-        // don't process remaining event contents
-        return
-    }
-    
-    // none for now...
 }
 
 def smartDetectEvent(smartDetectTypes)
