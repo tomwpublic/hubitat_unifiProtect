@@ -146,7 +146,7 @@ def clearImages()
 
 def setRecordingMode(mode)
 {
-    if(!(["always", "motion", "never"].contains(mode)))
+    if(!(["always", "motion", "never", "detections"].contains(mode)))
     {
         log.debug "unsupported recording mode (${mode})"
         return
