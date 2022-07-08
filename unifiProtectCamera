@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.3.6 - tomw - Improved event handling for motion and smart detect events
 1.3.4 - tomw - Added light support and "isDark" attribute on cameras and lights
 1.3.2 - tomw - Added command for setting recording mode.  Supported values are always/motion/never.
 1.2.1 - tomw - Added configurable snapshot size.  Default size is 640 x 360.
@@ -75,9 +76,28 @@ def processEvent(event, scrubStaleAttrs = false)
         sendEvent(name: "isDark", value: event.isDark)        
     }
     
-    if(!event.smartDetectTypes?.isEmpty() && (null != event.smartDetectTypes))
+    if(null != event.smartDetectTypes)
     {
         smartDetectEvent(event.smartDetectTypes)
+    }
+    
+    if(null != event.isMotionDetected)
+    {
+        sendEvent(name: "motion", value: event.isMotionDetected ? "active" : "inactive")
+        
+        if(hasSmartDetect() && !event.isMotionDetected)
+        {
+            // fail safe -- if we don't have any motion, we definitely don't have smart motion
+            smartDetectEvent(null)
+        }        
+    }
+    
+    if(null != event.isSmartDetected)
+    {
+        if(!event.isSmartDetected)
+        {
+            smartDetectEvent(null)
+        }
     }
     
     if(scrubStaleAttrs)
@@ -86,29 +106,38 @@ def processEvent(event, scrubStaleAttrs = false)
         return
     }
     
-    // if we have a motion event, register it.  otherwise, assume no motion.
-    sendEvent(name: "motion", value: event.lastMotion ? "active" : "inactive")
-}
-
-def motionActive()
-{
-    sendEvent(name: "motion", value: "active")
-}
-
-def motionInactive()
-{
-    sendEvent(name: "motion", value: "inactive")
+    // none for now...
 }
 
 def smartDetectEvent(smartDetectTypes)
 {
-    smartDetectTypes.each
+    if(null == smartDetectTypes)
     {
-        sendEvent(name: "smartDetectType", value: it, isStateChange: true)
+        // clear event state to default value
+        sendEvent(name: "smartDetectType", value: "waiting")
+        return
     }
     
-    pauseExecution(500)
-    sendEvent(name: "smartDetectType", value: "waiting", isStateChange: true)
+    smartDetectTypes.each
+    {
+        sendEvent(name: "smartDetectType", value: it)
+    }
+}
+
+def hasSmartDetect()
+{
+    if(null != state.hasSmartDetect)
+    {
+        return state.hasSmartDetect
+    }
+    
+    def cam = getParent()?.getBootstrap()?.cameras.find() { it.id == getCameraId()}
+    if(cam)
+    {
+        def hasSmartDetect = cam.featureFlags?.hasSmartDetect
+        state.hasSmartDetect = hasSmartDetect
+        return hasSmartDetect
+    }
 }
 
 def take()
@@ -162,12 +191,14 @@ def setRecordingMode(mode)
     }
 }
 
+def getCameraId()
+{
+    return device.getDeviceNetworkId()?.split('-')?.getAt(0)
+}
+
 def getCameraBaseUrl()
 {
-    def id = device.getDeviceNetworkId()?.split('-')?.getAt(0)
-    def baseUrlSuffix = "/proxy/protect/api/cameras/" + id
-    
-    return baseUrlSuffix
+    return "/proxy/protect/api/cameras/" + getCameraId()
 }
 
 def getCameraSnapSuffix()
