@@ -34,9 +34,6 @@ metadata
         capability "ImageCapture"
         capability "MotionSensor"
         
-        command "motionActive"
-        command "motionInactive"
-        
         command "clearImages"
         command "setRecordingMode", ["mode"]
         
