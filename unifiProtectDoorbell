@@ -58,12 +58,7 @@ def processEvent(event)
     }
 }
 
-def push()
-{
-    push(0)
-}
-
-def push(number)
+def push(number = 1)
 {
     sendEvent(name: "pushed", value: number, isStateChange: true)
 }
