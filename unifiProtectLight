@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.3.6 - tomw - Improved event handling
 1.3.4 - tomw - Added light support and "isDark" attribute on cameras and lights
 
 */
@@ -34,7 +35,7 @@ metadata
     }
 }
 
-def processEvent(event, scrubStaleAttrs = false)
+def processEvent(event)
 {
     if(!event)
     {
@@ -56,14 +57,10 @@ def processEvent(event, scrubStaleAttrs = false)
         sendEvent(name: "isDark", value: event.isDark)        
     }
     
-    if(scrubStaleAttrs)
+    if(null != event.isMotionDetected)
     {
-        // don't process remaining event contents
-        return
+        sendEvent(name: "motion", value: event.isMotionDetected ? "active" : "inactive")
     }
-    
-    // if we have a motion event, register it.  otherwise, assume no motion.
-    sendEvent(name: "motion", value: event.lastMotion ? "active" : "inactive")
 }
 
 private brightToPercent(bright)
