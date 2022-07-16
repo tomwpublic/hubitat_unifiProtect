@@ -368,7 +368,7 @@ def parse(String message)
 {
     //logDebug("parse: ${message}")
     
-    def packet = packetValidateAndDecode(message)    
+    def packet = packetValidateAndDecode(message)
     
     if(packet)
     {
@@ -740,7 +740,7 @@ private packetValidateAndDecode(hexString)
             throw new Exception("Header/Packet mismatch.")
         }
         
-        if(dataLength > 0x100)
+        if(dataLength > 0x180)
         {
             // presumed status packet, which introduces processing overhead due to chattiness
             return null
