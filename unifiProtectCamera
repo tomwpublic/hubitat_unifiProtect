@@ -38,7 +38,7 @@ metadata
         command "setRecordingMode", ["mode"]
         
         attribute "displayImage", "string"
-        attribute "isDark", "enum", [true, false]
+        attribute "isDark", "enum", ["true", "false"]
         attribute "smartDetectType", "string"
     }
 }
