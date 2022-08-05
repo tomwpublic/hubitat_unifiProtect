@@ -31,7 +31,7 @@ metadata
         capability "Switch"
         capability "SwitchLevel"
         
-        attribute "isDark", "enum", [true, false]
+        attribute "isDark", "enum", ["true", "false"]
     }
 }
 
