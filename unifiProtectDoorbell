@@ -34,8 +34,6 @@ metadata
         
         command "push", ["number"]
         command "clearNotification"
-        
-        attribute "isDark", "enum", [true, false]
     }
 }
 
