@@ -7,8 +7,6 @@ This provides various driver capabilities for Hubitat with UniFi Protect systems
 * *more capabilities may be added over time.*
 <br><br>
 
-**Update (July 2021):** The companion server and server.py are no longer required if you are running Hubitat platform version 2.2.8.143 or later and version 1.3.0 or later of this integration.  Please update to those versions for the best user experience.  **Previous info:** Note that this package requires a companion server that can run the python HTTP server script (server.py).  You can run this just about anywhere, including a Raspberry Pi or desktop PC.
-
 Most of this implementation is based on the work shared here:
 
 * https://github.com/hjdhjd/homebridge-unifi-protect
