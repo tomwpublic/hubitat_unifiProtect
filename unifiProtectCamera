@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.3.7 - tomw - Support G4 Doorbell Pro
 1.3.6 - tomw - Improved event handling
 1.3.4 - tomw - Added light support and "isDark" attribute on cameras and lights
 1.3.2 - tomw - Added command for setting recording mode.  Supported values are always/motion/never.
@@ -36,6 +37,8 @@ metadata
         
         command "clearImages"
         command "setRecordingMode", ["mode"]
+        
+        command "takePicture", [[name: "Camera lens to use", type:"ENUM", constraints: knownLensUrls().keySet()]]
         
         attribute "displayImage", "string"
         attribute "isDark", "enum", ["true", "false"]
@@ -113,27 +116,71 @@ def smartDetectEvent(smartDetectTypes)
     }
 }
 
-def hasSmartDetect()
+def knownLensUrls()
 {
-    if(null != state.hasSmartDetect)
+    def urls = 
+        [
+            "main": "snapshot",
+            "package": "package-snapshot"
+        ]
+    
+    return urls
+}
+
+def checkCamInfo(ffPath)
+{
+    if(null != state.getAt(ffPath))
     {
-        return state.hasSmartDetect
+        return state.getAt(ffPath)
     }
     
     def cam = getParent()?.getBootstrap()?.cameras.find() { it.id == getCameraId()}
     if(cam)
     {
-        def hasSmartDetect = cam.featureFlags?.hasSmartDetect
-        state.hasSmartDetect = hasSmartDetect
-        return hasSmartDetect
+        def val = cam.featureFlags?.getAt(ffPath)
+        state.putAt(ffPath, val)
+        return val
     }
 }
 
-def take()
+def hasSmartDetect()
+{
+    checkCamInfo("hasSmartDetect")
+}
+
+def hasPackageCamera()
+{
+    checkCamInfo("hasPackageCamera")
+}
+
+def takePicture(lens = "main")
 {
     try
     {
-        def stream = getParent()?.httpExecWithAuthCheck("GET", parent?.genParamsMain(getCameraSnapSuffix()), true)?.data
+        if(!knownLensUrls().keySet().contains(lens))
+        {
+            throw new Exception("\"${lens}\" lens type not supported")
+        }
+        
+        if("package" == lens && !hasPackageCamera())
+        {
+            throw new Exception("\"${lens}\" lens type not supported")
+        }
+        
+        take(lens)
+    }
+    catch (Exception e)
+    {
+        log.warn e.message
+        take()
+    }
+}
+
+def take(lens = "main")
+{
+    try
+    {
+        def stream = getParent()?.httpExecWithAuthCheck("GET", parent?.genParamsMain(getCameraSnapSuffix(lens)), true)?.data
         
         if(stream)
         {
@@ -190,7 +237,7 @@ def getCameraBaseUrl()
     return "/proxy/protect/api/cameras/" + getCameraId()
 }
 
-def getCameraSnapSuffix()
+def getCameraSnapSuffix(lens = "main")
 {
-    return getCameraBaseUrl() + "/snapshot?force=true&w=${snapWidth ?: 640}&h=${snapHeight ?: 360}"
+    return getCameraBaseUrl() + "/${knownLensUrls()?.getAt(lens)}?force=true&w=${snapWidth ?: 640}&h=${snapHeight ?: 360}"
 }
