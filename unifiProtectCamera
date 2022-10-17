@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.3.8 - tomw - Add camera LED indicator control (capability Switch)
 1.3.7 - tomw - Support G4 Doorbell Pro
 1.3.6 - tomw - Improved event handling
 1.3.4 - tomw - Added light support and "isDark" attribute on cameras and lights
@@ -34,6 +35,10 @@ metadata
     {
         capability "ImageCapture"
         capability "MotionSensor"
+        capability "Switch"
+        
+        command "on", [[name: "turn on status LED", type:"BOOL", description:"turn on status LED"]]
+        command "off", [[name: "turn off status LED", type:"BOOL", description:"turn off status LED"]]
         
         command "clearImages"
         command "setRecordingMode", ["mode"]
@@ -90,6 +95,11 @@ def processEvent(event)
             // fail safe -- if we don't have any motion, we definitely don't have smart motion
             smartDetectEvent(null)
         }        
+    }
+    
+    if(null != event.ledSettings?.isEnabled)
+    {
+        sendEvent(name: "switch", value: event.ledSettings.isEnabled ? "on" : "off")
     }
     
     if(null != event.isSmartDetected)
@@ -217,13 +227,28 @@ def setRecordingMode(mode)
         return
     }
     
+    updateCamera([recordingSettings: [mode: mode]])
+}
+
+def on()
+{
+    updateCamera([ledSettings: [isEnabled: true]])
+}
+
+def off()
+{
+    updateCamera([ledSettings: [isEnabled: false]])
+}
+
+def updateCamera(Map data)
+{
     try
     {
-        getParent()?.httpExecWithAuthCheck("PATCH", parent?.genParamsMain(getCameraBaseUrl(), new groovy.json.JsonOutput().toJson([recordingSettings: [mode: mode]])), true)
+        getParent()?.httpExecWithAuthCheck("PATCH", parent?.genParamsMain(getCameraBaseUrl(), new groovy.json.JsonOutput().toJson(data)), true)
     }
     catch (Exception e)
     {
-        log.debug "setRecordingMode() failed: ${e.message}"
+        log.debug "updateCamera(${data}) failed: ${e.message}"
     }
 }
 
