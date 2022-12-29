@@ -181,16 +181,8 @@ def serveLatest()
 
 def renderImageMap(dev)
 {
-    def width = dev.getDataValue('snapWidth') ?: 640
-    def height = dev.getDataValue('snapHeight') ?: 360
     def image = dev.currentValue('image')
     
-    def encodedImage = "data:image/jpeg;base64," + hubitat.helper.HexUtils.hexStringToByteArray(image).encodeBase64().toString()
-    
-    return [
-                contentType: "image/svg+xml",
-                data: "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" " +
-                    "height=\"${height}\" width=\"${width}\"><image width=\"${width}\" height=\"${height}\" xlink:href=\"${encodedImage}\"/></svg>",
-                status: 200
-            ]
+    def encodedImage = hubitat.helper.HexUtils.hexStringToByteArray(dev.currentValue('image'))
+    return [contentType: "image/jpeg;base64", data: encodedImage, status: 200]
 }
