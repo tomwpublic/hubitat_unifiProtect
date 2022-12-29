@@ -63,6 +63,7 @@ def mainPage2()
         {
             paragraph("<b>Most recent image out of all of the selected devices:</b>")
             paragraph("<p style='margin-left:10%'>${getFullLocalApiServerUrl() + "/${latestPath}?access_token=${token}"}</p>")
+            paragraph("<p style='margin-left:10%'>${getFullApiServerUrl() + "/${latestPath}?access_token=${token}"}</p>")
         }
         section
         {
@@ -169,7 +170,11 @@ def serveLatest()
                 }
             }
         }
-
+        
+        // Fail-safe -- if events have aged out, just use the first device.
+        //     This feels like a bug in the Hubitat Device.events() API
+        if(null == latestDev) { latestDev = sourceDevs[0] }
+        
         return render(renderImageMap(latestDev))
     }
     catch (Exception e)
