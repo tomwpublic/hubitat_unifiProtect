@@ -1,6 +1,26 @@
 /*
 
- */
+Copyright 2020 - tomw
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+-------------------------------------------
+
+Change history:
+
+0.1.0 - tomw - Pre-release version
+
+*/
 
 definition(
     name: "Image Server",
@@ -41,6 +61,11 @@ def mainPage2()
     {
         section
         {
+            paragraph("<b>Most recent image out of all of the selected devices:</b>")
+            paragraph("<p style='margin-left:10%'>${getFullLocalApiServerUrl() + "/${latestPath}?access_token=${token}"}</p>")
+        }
+        section
+        {
             for(dev in sourceDevs)
             {
                 paragraph("<b>${dev.getName()}:</b>")
@@ -71,6 +96,7 @@ def getToken()
 
 import groovy.transform.Field
 @Field String imagePath = "image"
+@Field String latestPath = "latest"
 
 mappings
 {
@@ -79,6 +105,14 @@ mappings
         action:
             [
                 GET: "serveImage"
+            ]
+    }
+    
+    path("/${latestPath}")
+    {
+        action:
+            [
+                GET: "serveLatest"
             ]
     }
 }
@@ -100,27 +134,9 @@ def serveImage()
                     throw new Exception("no image attribute present")
                 }
             
-                logDebug("Image Server matched ${dev.getName()}")
-            
-                def encodedImage
+                logDebug("Image Server matched ${dev.getName()}")            
                 
-                def width = dev.currentValue('snapWidth') ?: 640
-                def height = dev.currentValue('snapHeight') ?: 360
-            
-                switch(params.format)
-                {
-                    case "svg+xml":
-                    default:
-                        encodedImage = "data:image/jpeg;base64," + hubitat.helper.HexUtils.hexStringToByteArray(dev.currentValue('image')).encodeBase64().toString()
-                        return render(contentType: "image/svg+xml", 
-                                      data: "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" " + 
-                                      "height=\"${height}\" width=\"${width}\"><image width=\"${width}\" height=\"${height}\" xlink:href=\"${encodedImage}\"/></svg>",
-                                      status: 200)
-                
-                    case "jpeg":
-                        encodedImage = hubitat.helper.HexUtils.hexStringToByteArray(dev.currentValue('image'))
-                        return render(contentType: "image/jpeg;base64", data: encodedImage, status: 200)
-                }
+                return render(renderImageMap(dev))
             }
         }
         
@@ -130,4 +146,51 @@ def serveImage()
     {
         return render(contentType: "text/html", data: "Image Server: ${e.message}", status: 200) 
     }
+}
+
+def serveLatest()
+{
+    try
+    {
+        def time = 0
+        def latestDev
+        
+        for(dev in sourceDevs)
+        {
+            dev.events().each
+            {
+                if(it.name == "image")
+                {
+                    if(it.getUnixTime() > time)
+                    {
+                        time = it.getUnixTime()
+                        latestDev = dev
+                    }
+                }
+            }
+        }
+
+        return render(renderImageMap(latestDev))
+    }
+    catch (Exception e)
+    {
+        return render(contentType: "text/html", data: "Image Server: ${e.message}", status: 200) 
+    }
+    
+}
+
+def renderImageMap(dev)
+{
+    def width = dev.getDataValue('snapWidth') ?: 640
+    def height = dev.getDataValue('snapHeight') ?: 360
+    def image = dev.currentValue('image')
+    
+    def encodedImage = "data:image/jpeg;base64," + hubitat.helper.HexUtils.hexStringToByteArray(image).encodeBase64().toString()
+    
+    return [
+                contentType: "image/svg+xml",
+                data: "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" " +
+                    "height=\"${height}\" width=\"${width}\"><image width=\"${width}\" height=\"${height}\" xlink:href=\"${encodedImage}\"/></svg>",
+                status: 200
+            ]
 }
