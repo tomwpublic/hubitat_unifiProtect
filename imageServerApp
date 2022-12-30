@@ -34,17 +34,25 @@ definition(
 
 preferences
 {
-    page(name: "mainPage1")
-    page(name: "mainPage2")
+    page(name: "entryPage")
+    page(name: "webServerPage")
+    page(name: "webServerUrlsPage")
+    page(name: "pushoverPage")
 }
 
-def mainPage1()
+def uninstalled()
 {
-    dynamicPage(name: "mainPage1", title: "", nextPage: "mainPage2", install: false, uninstall: true)
+    unsubscribe()
+}
+
+def entryPage()
+{
+    dynamicPage(name: "entryPage", title: "", install: true, uninstall: true)
     {
         section
         {
-            input name:	"sourceDevs", type: "capability.*", title: "Select any devices with the 'image' attribute.", multiple: true, required: true
+            href(page: "webServerPage", title: "<b>Select devices to serve images for dashboards and webpages.</b>")
+            href(page: "pushoverPage", title: "<b>Select devices to use for Pushover notifications.</b>")
         }
         section
         {
@@ -53,11 +61,53 @@ def mainPage1()
     }
 }
 
-def mainPage2()
+def linkToMain()
+{
+    return href(page: "entryPage", title: "<b>Return to main page.</b>")
+}
+
+def webServerPage()
+{
+    dynamicPage(name: "webServerPage", title: "", nextPage: "webServerUrlsPage", install: false, uninstall: true)
+    {
+        section
+        {
+            input name:	"sourceDevs", type: "capability.*", title: "Select any devices with the 'image' attribute.", multiple: true, required: false
+        }        
+        section
+        {
+            linkToMain()
+        }
+    }
+}
+
+def pushoverPage()
+{
+    dynamicPage(name: "pushoverPage", title: "", install: true, uninstall: true)
+    {
+        unsubscribe()
+        if(pushoverDevs)
+        {
+            subscribe(pushoverDevs, "image", "notificationHandler")
+        }
+        section
+        {
+            input name:	"pushoverDevs", type: "capability.*", title: "Select any devices with the 'image' attribute.", multiple: true, required: false, submitOnChange: true
+            input name:	"poUserKey", type: "text", title: "Pushover User Key", required: false
+            input name:	"poApiToken", type: "text", title: "Pushover API Token", required: false
+        }        
+        section
+        {
+            linkToMain()
+        }
+    }
+}
+
+def webServerUrlsPage()
 {
     def token = getToken()
     
-    dynamicPage(name: "mainPage2", title: "", install: true, uninstall: true)
+    dynamicPage(name: "webServerUrlsPage", title: "", install: true, uninstall: true)
     {
         section
         {
@@ -73,6 +123,10 @@ def mainPage2()
                 paragraph("<p style='margin-left:10%'>${getFullLocalApiServerUrl() + "/${imagePath}/${dev.getDeviceNetworkId()}?access_token=${token}"}</p>")
                 paragraph("<p style='margin-left:10%'>${getFullApiServerUrl() + "/${imagePath}/${dev.getDeviceNetworkId()}?access_token=${token}"}</p>")
             }
+        }
+        section
+        {
+            linkToMain()
         }
     }
 }
@@ -173,7 +227,7 @@ def serveLatest()
         
         // Fail-safe -- if events have aged out, just use the first device.
         //     This feels like a bug in the Hubitat Device.events() API
-        if(null == latestDev) { latestDev = sourceDevs[0] }
+        if(null == latestDev) { latestDev = sourceDevs?.getAt(0) }
         
         return render(renderImageMap(latestDev))
     }
@@ -186,8 +240,81 @@ def serveLatest()
 
 def renderImageMap(dev)
 {
-    def image = dev.currentValue('image')
+    def imageArr = hubitat.helper.HexUtils.hexStringToByteArray(dev.currentValue('image'))
+    return [contentType: "image/jpeg;base64", data: imageArr, status: 200]
+}
+
+def notificationHandler(evt)
+{
+    def dev = evt.getDevice()
+    def title = evt.getDisplayName()
+    def date = evt.getDate()
     
-    def encodedImage = hubitat.helper.HexUtils.hexStringToByteArray(dev.currentValue('image'))
-    return [contentType: "image/jpeg;base64", data: encodedImage, status: 200]
+    if(dev.currentValue('image') != "n/a")
+    {
+        logDebug("new image on device: ${dev}")
+        pushoverNotification(dev, title, "New image: ${date}")
+    }
+}
+
+def pushoverNotification(dev, String title = "", String message = "New Image")
+{
+    if([poUserKey, poApiToken].contains(null))
+    {
+        logDebug("missing Pushover credentials")
+        return
+    }
+    
+    def imageArr = hubitat.helper.HexUtils.hexStringToByteArray(dev.currentValue('image'))
+    
+    // thanks!
+    //  below code was referenced from Younes at https://community.hubitat.com/t/solved-pushover-notification-with-image/102299
+    
+    //Top Part of the POST request Body
+    def postBodyTop = 
+        """----rjtvk266t3df6jkpb4\r\nContent-Disposition: form-data; 
+        name="user"\r\n\r\n${poUserKey}\r\n----rjtvk266t3df6jkpb4\r\nContent-Disposition: form-data; 
+        name="token"\r\n\r\n${poApiToken}\r\n----rjtvk266t3df6jkpb4\r\nContent-Disposition: form-data; 
+        name="title"\r\n\r\n${title}\r\n----rjtvk266t3df6jkpb4\r\nContent-Disposition: form-data; 
+        name="message"\r\n\r\n${message}\r\n----rjtvk266t3df6jkpb4\r\nContent-Disposition: form-data; 
+        name="attachment"; filename="image.jpg"\r\nContent-Type: image/jpeg\r\n\r\n"""
+
+    //Bottom Part of the POST request Body
+    def postBodyBottom = """\r\n----rjtvk266t3df6jkpb4--"""
+    
+    try
+    {
+        byte[] postBodyTopArr = postBodyTop.getBytes("UTF-8")
+        byte[] postBodyBottomArr = postBodyBottom.getBytes("UTF-8")
+        
+        //Combine different parts of the POST request body
+        ByteArrayOutputStream postBodyOutputStream = new ByteArrayOutputStream();
+        
+        postBodyOutputStream.write(postBodyTopArr);
+        postBodyOutputStream.write(imageArr);
+        postBodyOutputStream.write(postBodyBottomArr);
+        
+        byte[] postBody = postBodyOutputStream.toByteArray();
+        
+        //Build HTTP Request Parameters
+        def params =
+        [
+            requestContentType: "application/octet-stream",
+            headers: ["content-type": "multipart/form-data; boundary=--rjtvk266t3df6jkpb4"],
+            uri: "https://api.pushover.net/1/messages.json",
+            body: postBody
+        ]
+        
+        httpPost(params)
+        { resp ->
+            if(resp.status != 200)
+            {
+                throw new Exception("HTTP error: ${resp.status}")
+            }
+        }
+    }
+    catch(Exception e)
+    {
+        log.error "pushoverNotification error: ${e.message}"
+    }
 }
