@@ -36,7 +36,6 @@ preferences
 {
     page(name: "entryPage")
     page(name: "webServerPage")
-    page(name: "webServerUrlsPage")
     page(name: "pushoverPage")
 }
 
@@ -68,12 +67,25 @@ def linkToMain()
 
 def webServerPage()
 {
-    dynamicPage(name: "webServerPage", title: "", nextPage: "webServerUrlsPage", install: false, uninstall: true)
+    dynamicPage(name: "webServerPage", title: "", install: true, uninstall: true)
     {
         section
         {
-            input name:	"sourceDevs", type: "capability.*", title: "Select any devices with the 'image' attribute.", multiple: true, required: false
-        }        
+            input name:	"sourceDevs", type: "capability.*", title: "Select any devices with the 'image' attribute.", multiple: true, required: false, submitOnChange: true
+        }
+        section
+        {
+            paragraph("<h2>Use these URLs to access images:</h2>")
+            
+            for(dev in sourceDevs)
+            {
+                paragraph("<b>${dev.getName()}:</b>")
+                paragraph("<p style='margin-left:10%'>${getFullLocalApiServerUrl() + "/${imagePath}/${dev.getDeviceNetworkId()}?access_token=${token}"}</p>")
+            }
+            
+            paragraph("<b>Single most recent image out of all of the selected devices:</b>")
+            paragraph("<p style='margin-left:10%'>${getFullLocalApiServerUrl() + "/${latestPath}?access_token=${token}"}</p>")
+        }
         section
         {
             linkToMain()
@@ -96,34 +108,6 @@ def pushoverPage()
             input name:	"poUserKey", type: "text", title: "Pushover User Key", required: false
             input name:	"poApiToken", type: "text", title: "Pushover API Token", required: false
         }        
-        section
-        {
-            linkToMain()
-        }
-    }
-}
-
-def webServerUrlsPage()
-{
-    def token = getToken()
-    
-    dynamicPage(name: "webServerUrlsPage", title: "", install: true, uninstall: true)
-    {
-        section
-        {
-            paragraph("<b>Most recent image out of all of the selected devices:</b>")
-            paragraph("<p style='margin-left:10%'>${getFullLocalApiServerUrl() + "/${latestPath}?access_token=${token}"}</p>")
-            paragraph("<p style='margin-left:10%'>${getFullApiServerUrl() + "/${latestPath}?access_token=${token}"}</p>")
-        }
-        section
-        {
-            for(dev in sourceDevs)
-            {
-                paragraph("<b>${dev.getName()}:</b>")
-                paragraph("<p style='margin-left:10%'>${getFullLocalApiServerUrl() + "/${imagePath}/${dev.getDeviceNetworkId()}?access_token=${token}"}</p>")
-                paragraph("<p style='margin-left:10%'>${getFullApiServerUrl() + "/${imagePath}/${dev.getDeviceNetworkId()}?access_token=${token}"}</p>")
-            }
-        }
         section
         {
             linkToMain()
