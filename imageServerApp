@@ -230,7 +230,12 @@ def invalidImageVals()
 
 def renderImageMap(dev)
 {
-    def image = getImageAttr(dev)    
+    def image = getImageAttr(dev)
+    if(null == image)
+    {
+        // the file was deleted, or something
+        throw new Exception("image missing")
+    }
     
     def imageArr = hubitat.helper.HexUtils.hexStringToByteArray(image)
     return [contentType: "image/jpeg;base64", data: imageArr, status: 200]
