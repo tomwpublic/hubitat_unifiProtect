@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.4.0 - tomw - Store images from 'take' in File Manager
 1.3.9 - tomw - Save snapWidth and snapHeight to device data, for use by imageServerApp
 1.3.8 - tomw - Add camera LED indicator control (capability Switch)
 1.3.7 - tomw - Support G4 Doorbell Pro
@@ -42,11 +43,12 @@ metadata
         command "off", [[name: "turn off status LED", type:"BOOL", description:"turn off status LED"]]
         
         command "clearImages"
+        attribute "imageTimestamp", "string"
+        
         command "setRecordingMode", ["mode"]
         
         command "takePicture", [[name: "Camera lens to use", type:"ENUM", constraints: knownLensUrls().keySet()]]
         
-        attribute "displayImage", "string"
         attribute "isDark", "enum", ["true", "false"]
         attribute "smartDetectType", "string"
     }
@@ -76,6 +78,11 @@ def updated()
 {
     updateDataValue("snapWidth", snapWidth.toString())
     updateDataValue("snapHeight", snapHeight.toString())
+}
+
+def uninstalled()
+{
+    deleteImageFile()
 }
 
 def processEvent(event)
@@ -208,12 +215,11 @@ def take(lens = "main")
             stream.read(imageArr, 0, bSize)
             def image = hubitat.helper.HexUtils.byteArrayToHexString(imageArr)
             
-            sendEvent(name: "image", value: image)
-            
-            def encodedImage = imageArr.encodeBase64().toString()
-            def displayImage = '<img src="data:image/jpeg;base64,' + encodedImage + '">'
-            
-            sendEvent(name: "displayImage", value: displayImage)
+            if(writeImageToFile(image))
+            {
+                sendEvent(name: "image", value: filePath(), isStateChange: true)
+                sendEvent(name: "imageTimestamp", value: now())
+            }
         }
     }
     catch (Exception e)
@@ -224,6 +230,7 @@ def take(lens = "main")
 
 def clearImages()
 {
+    deleteImageFile()
     sendEvent(name: "image", value: "n/a")
     sendEvent(name: "displayImage", value: "n/a")   
 }
@@ -274,4 +281,88 @@ def getCameraBaseUrl()
 def getCameraSnapSuffix(lens = "main")
 {
     return getCameraBaseUrl() + "/${knownLensUrls()?.getAt(lens)}?force=true&w=${snapWidth ?: 640}&h=${snapHeight ?: 360}"
+}
+
+//////////////////////////////////////
+// File system operations
+//////////////////////////////////////
+
+def fileName()
+{
+    return device.getDeviceNetworkId()
+}
+
+def filePath()
+{
+    return "http://127.0.0.1:8080/local/${fileName()}"
+}
+
+def writeImageToFile(String image)
+{
+    if(null == image) { return }
+    
+    // with great thanks to Jean P. May, Jr. (thebearmay) -- https://raw.githubusercontent.com/thebearmay/hubitat/main/fileMgr.groovy
+
+    def imageType = "text/plain"    
+    def boundary = now()?.toString()
+    
+    def header = ("""--${boundary}\r\nContent-Disposition: form-data; name="uploadFile"; filename="${fileName()}"\r\nContent-Type:${imageType}\r\n\r\n""").getBytes("UTF-8")
+    def footer = ("""\r\n\r\n--${boundary}\r\nContent-Disposition: form-data; name="folder"\r\n\r\n--${boundary}--""").getBytes("UTF-8")
+    
+    java.io.ByteArrayOutputStream stream = new java.io.ByteArrayOutputStream()
+    stream.write(header)
+    stream.write(image.getBytes("UTF-8"))
+    stream.write(footer)
+    
+    def params =
+        [
+            uri: 'http://127.0.0.1:8080',
+            path: '/hub/fileManager/upload',
+            query: [ folder: '/' ],
+            requestContentType: "application/octet-stream",
+            headers: [ 'Content-Type': "multipart/form-data; boundary=${boundary}" ],
+            body: stream.toByteArray(),
+            ignoreSSLIssues: true
+        ]
+    
+    def success
+    try
+    {
+        httpPost(params)
+        { resp ->
+            success = resp?.data?.success
+        }
+        
+        return success
+    }
+    catch(Exception e)
+    {
+		log.error "Error writing file: ${e.message}"
+	}
+}
+
+def deleteImageFile(fileName = fileName())
+{
+    // thanks -- https://raw.githubusercontent.com/thebearmay/hubitat/main/fileMgr.groovy
+    
+    def body = groovy.json.JsonOutput.toJson( [name:"${fileName}", type:"file"] )
+    params = 
+        [
+            uri: "http://127.0.0.1:8080",
+            path: "/hub/fileManager/delete",
+            contentType:"text/plain",
+            requestContentType:"application/json",
+            body: body
+        ]
+    
+    def success
+    try
+    {
+        httpPost(params)
+        { }
+    }
+    catch(Exception e)
+    {
+		log.error "Error deleting file: ${e.message}"
+	}
 }
