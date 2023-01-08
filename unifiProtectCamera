@@ -232,7 +232,7 @@ def clearImages()
 {
     deleteImageFile()
     sendEvent(name: "image", value: "n/a")
-    sendEvent(name: "displayImage", value: "n/a")   
+    sendEvent(name: "imageTimestamp", value: "n/a")  
 }
 
 def setRecordingMode(mode)
