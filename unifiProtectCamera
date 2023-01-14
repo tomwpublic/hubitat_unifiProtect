@@ -213,13 +213,10 @@ def take(lens = "main")
             def bSize = stream.available()
             byte[] imageArr = new byte[bSize]
             stream.read(imageArr, 0, bSize)
-            def image = hubitat.helper.HexUtils.byteArrayToHexString(imageArr)
             
-            if(writeImageToFile(image))
-            {
-                sendEvent(name: "image", value: filePath(), isStateChange: true)
-                sendEvent(name: "imageTimestamp", value: now())
-            }
+            writeImageToFile(imageArr)
+            sendEvent(name: "image", value: "file:${fileName()}", isStateChange: true)
+            sendEvent(name: "imageTimestamp", value: now())
         }
     }
     catch (Exception e)
@@ -232,7 +229,7 @@ def clearImages()
 {
     deleteImageFile()
     sendEvent(name: "image", value: "n/a")
-    sendEvent(name: "imageTimestamp", value: "n/a")  
+    sendEvent(name: "imageTimestamp", value: "n/a")
 }
 
 def setRecordingMode(mode)
@@ -292,77 +289,14 @@ def fileName()
     return device.getDeviceNetworkId()
 }
 
-def filePath()
-{
-    return "http://127.0.0.1:8080/local/${fileName()}"
-}
-
-def writeImageToFile(String image)
+def writeImageToFile(byte[] image)
 {
     if(null == image) { return }
     
-    // with great thanks to Jean P. May, Jr. (thebearmay) -- https://raw.githubusercontent.com/thebearmay/hubitat/main/fileMgr.groovy
-
-    def imageType = "text/plain"    
-    def boundary = now()?.toString()
-    
-    def header = ("""--${boundary}\r\nContent-Disposition: form-data; name="uploadFile"; filename="${fileName()}"\r\nContent-Type:${imageType}\r\n\r\n""").getBytes("UTF-8")
-    def footer = ("""\r\n\r\n--${boundary}\r\nContent-Disposition: form-data; name="folder"\r\n\r\n--${boundary}--""").getBytes("UTF-8")
-    
-    java.io.ByteArrayOutputStream stream = new java.io.ByteArrayOutputStream()
-    stream.write(header)
-    stream.write(image.getBytes("UTF-8"))
-    stream.write(footer)
-    
-    def params =
-        [
-            uri: 'http://127.0.0.1:8080',
-            path: '/hub/fileManager/upload',
-            query: [ folder: '/' ],
-            requestContentType: "application/octet-stream",
-            headers: [ 'Content-Type': "multipart/form-data; boundary=${boundary}" ],
-            body: stream.toByteArray(),
-            ignoreSSLIssues: true
-        ]
-    
-    def success
-    try
-    {
-        httpPost(params)
-        { resp ->
-            success = resp?.data?.success
-        }
-        
-        return success
-    }
-    catch(Exception e)
-    {
-		log.error "Error writing file: ${e.message}"
-	}
+    uploadHubFile(fileName(), image)
 }
 
 def deleteImageFile(fileName = fileName())
 {
-    // thanks -- https://raw.githubusercontent.com/thebearmay/hubitat/main/fileMgr.groovy
-    
-    def body = groovy.json.JsonOutput.toJson( [name:"${fileName}", type:"file"] )
-    params = 
-        [
-            uri: "http://127.0.0.1:8080",
-            path: "/hub/fileManager/delete",
-            contentType:"text/plain",
-            requestContentType:"application/json",
-            body: body
-        ]
-    
-    def success
-    try
-    {
-        httpPost(params)
-        { }
-    }
-    catch(Exception e)
-    {
-		log.error "Error deleting file: ${e.message}"
-	}
+    deleteHubFile(fileName)
 }
