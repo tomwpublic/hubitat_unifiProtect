@@ -3,7 +3,7 @@
   "packageName": "hubitat_unifiProtect",
   "author": "tomw",
   "version": "1.3.9",
-  "minimumHEVersion": "2.1.9",
+  "minimumHEVersion": "2.3.4.132",
   "dateReleased": "2021-01-08",
   "drivers": [
     {
