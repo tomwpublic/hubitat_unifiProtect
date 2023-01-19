@@ -2,7 +2,7 @@
 {
   "packageName": "hubitat_unifiProtect",
   "author": "tomw",
-  "version": "1.3.9",
+  "version": "1.4.0",
   "minimumHEVersion": "2.3.4.132",
   "dateReleased": "2021-01-08",
   "drivers": [
@@ -36,7 +36,7 @@
     }
   ],
   "licenseFile": "https://raw.githubusercontent.com/tomwpublic/hubitat_unifiProtect/main/LICENSE",
-  "releaseNotes": "1.3.9 - tomw - Save snapWidth and snapHeight to device data, for use by imageServerApp\n1.3.8 - tomw - Add camera LED indicator control (capability Switch)\n1.3.7 - tomw - Support G4 Doorbell Pro\n1.3.6 - tomw - Improved event handling\n1.3.5 - tomw - Bugfix for non-deflated event packets\n1.3.4 - tomw - Added light support and \"isDark\" attribute on cameras and lights\n1.3.3 - tomw - Bugfix in login flow\n1.3.2 - tomw - Added command for setting recording mode.  Supported values are always/motion/never.\n1.3.1 - tomw - Hide unused server.py preferences for IP/port\n1.3.0 - tomw - Local processing for events.  No server.py required with Hubitat 2.2.8.143 and later.\n1.2.4 - tomw - Improved recovery behavior when Initialize fails.  Reduced State storage usage.\n1.2.3 - tomw - Bugfixes for websocket error handling.\n1.2.2 - tomw - Improvements for websocket uptime.\n1.2.1 - tomw - Added configurable snapshot size.  Default size is 640 x 360.\n1.2.0 - tomw - Added doorbell LCD message support.\n1.1.0 - tomw - Added Smart Detect support (for supported cameras only, must be configured in UniFi Protect controller).\n1.0.0 - tomw - Initial release.",
+  "releaseNotes": "1.4.0 - tomw - Store images from 'take' in File Manager\n1.3.9 - tomw - Save snapWidth and snapHeight to device data, for use by imageServerApp\n1.3.8 - tomw - Add camera LED indicator control (capability Switch)\n1.3.7 - tomw - Support G4 Doorbell Pro\n1.3.6 - tomw - Improved event handling\n1.3.5 - tomw - Bugfix for non-deflated event packets\n1.3.4 - tomw - Added light support and \"isDark\" attribute on cameras and lights\n1.3.3 - tomw - Bugfix in login flow\n1.3.2 - tomw - Added command for setting recording mode.  Supported values are always/motion/never.\n1.3.1 - tomw - Hide unused server.py preferences for IP/port\n1.3.0 - tomw - Local processing for events.  No server.py required with Hubitat 2.2.8.143 and later.\n1.2.4 - tomw - Improved recovery behavior when Initialize fails.  Reduced State storage usage.\n1.2.3 - tomw - Bugfixes for websocket error handling.\n1.2.2 - tomw - Improvements for websocket uptime.\n1.2.1 - tomw - Added configurable snapshot size.  Default size is 640 x 360.\n1.2.0 - tomw - Added doorbell LCD message support.\n1.1.0 - tomw - Added Smart Detect support (for supported cameras only, must be configured in UniFi Protect controller).\n1.0.0 - tomw - Initial release.",
   "documentationLink": "https://github.com/tomwpublic/hubitat_unifiProtect/blob/main/README.md",
   "communityLink": "https://community.hubitat.com/t/ubiquiti-unifi-protect-cameras/17624/37"
 }
