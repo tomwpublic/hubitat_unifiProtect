@@ -32,8 +32,8 @@ Special thanks to @Bago for their troubleshooting help.
 * Utilize Motion (from cameras, doorbells, and lights) and PushableButton (from doorbell) events, according to whatever is supported by your devices
 * Use ```on()```, ```off()```, and ```setLevel()``` on lights
 * Use the ```take()``` command on camera devices to take a snapshot from the main lens of the camera
-    * A text attribute, ```displayImage``` will contain an HTML data URL to display the image on Dashboards.  A generic *Attribute* tile will render this for you.
-    * Note that this may be a very large image, so if page loads or other performance suffers the ```clearImages()``` command can be used to flush the data
+    * This will store an image locally in the File Manager of your Hubitat hub (requires Hubitat software 2.3.4.132 or later).
+    * To display or use the stored image, use my companion app *hubitat_imageServer* (available through HPM and GitHub).
 * Use the ```takePicture()``` command for capturing snapshots from camera devices that have multiple lenses, like the G4 Doorbell Pro.  
 * Use the ```setRecordingMode(mode)``` on camera devices to modify the recording mode.  Supported modes: "always", "never", and either "motion" or "detections" (try both to see which is correct) depending on your version of UniFi Protect.
 * Use the ```deviceNotification()``` command on doorbell devices to print a message to the LCD screen
