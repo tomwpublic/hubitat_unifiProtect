@@ -219,6 +219,21 @@ def take(lens = "main")
             sendEvent(name: "imageTimestamp", value: now())
         }
     }
+    catch(groovy.lang.MissingMethodException e)
+    {
+        def errMsg = "take() failed: "
+        if(e.message.contains("uploadHubFile"))
+        {
+            errMsg += "You must update your Hubitat software to at least version 2.3.4.132."
+        }
+        else
+        {
+            errMsg += e.message
+        }
+        
+        log.error errMsg        
+        return  
+    }
     catch (Exception e)
     {
         log.debug "take() failed: ${e.message}"
