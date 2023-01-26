@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.4.1 - tomw - Performance improvements to reduce hub load
 1.3.7 - tomw - Support G4 Doorbell Pro
 1.3.6 - tomw - Improved event handling
 1.3.5 - tomw - Bugfix for non-deflated event packets (exposed by controller version 2.1.1-beta.3)
@@ -33,8 +34,6 @@ Change history:
 1.0.0 - tomw - Initial release
 
 */
-
-import groovy.transform.Field
 
 metadata
 {
@@ -55,11 +54,6 @@ preferences
     section
     {
         input "controllerIP", "text", title: "UniFi controller IP", required: true
-        if(!localDecompressSupported())
-        {
-            input "rpiIP", "text", title: "server.py IP", required: true
-            input "rpiPort", "text", title: "server.py port (typically 2112)", defaultValue: "2112", required: true
-        }
     }
     section
     {
@@ -69,6 +63,7 @@ preferences
     section
     {
         input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
+        input name: "disablePreFiltering", type: "bool", title: "Disable event pre-filtering<br>(not recommended, will consume more hub CPU)", defaultValue: false
     }
 }
 
@@ -95,8 +90,7 @@ def initialize()
         
         refreshCookie()
         refresh()
-        
-        pyErrorCount = 0
+
         runIn(5, openEventSocket)
         
         sendEvent(name: "commStatus", value: "good")
@@ -195,7 +189,7 @@ def getWssURI(id)
 
 def login()
 {
-    def resp = httpExec("POST", genParamsAuth(), true)
+    def resp = httpExec("POST", genParamsAuth())
     //logDebug("login = ${resp.data}")
     
     updateAuthTokensStore(resp)
@@ -517,119 +511,35 @@ def getBootstrap()
     return state.bootstrap
 }
 
-def httpGetExec(params, throwToCaller = false)
+def httpExec(operation, params)
 {
-    //logDebug("httpGetExec(${params})")
+    def result = null
     
-    try
-    {
-        def result
-        httpGet(params)
-        { resp ->
-            if (resp)
-            {
-                //logDebug("resp.data = ${resp.data}")
-                result = resp
-            }
-        }
-        return result
-    }
-    catch (Exception e)
-    {
-        logDebug("httpGetExec() failed: ${e.message}")
-        //logDebug("status = ${e.getResponse().getStatus().toInteger()}")
-        if(throwToCaller)
-        {
-            throw(e)
-        }
-    }
-}
-
-def httpPostExec(params, throwToCaller = false)
-{
-    //logDebug("httpPostExec(${params})")
+    //logDebug("httpExec(${operation}, ${params})")
     
-    try
-    {
-        def result
-        httpPost(params)
-        { resp ->
-            if (resp)
-            {
-                //logDebug("resp.data = ${resp.data}")
-                result = resp
-            }
-        }
-        return result
+    def httpClosure = 
+    { resp ->
+        result = resp
+        //logDebug("result.data = ${result.data}")
     }
-    catch (Exception e)
-    {
-        logDebug("httpPostExec() failed: ${e.message}")
-        //logDebug("status = ${e.getResponse().getStatus().toInteger()}")
-        if(throwToCaller)
-        {
-            throw(e)
-        }
-    }
-}
-
-def httpPatchExec(params, throwToCaller = false)
-{
-    //logDebug("httpPatchExec(${params})")
     
-    try
-    {
-        def result
-        httpPatch(params)
-        { resp ->
-            if (resp)
-            {
-                //logDebug("resp.data = ${resp.data}")
-                result = resp
-            }
-        }
-        return result
-    }
-    catch (Exception e)
-    {
-        logDebug("httpPatchExec() failed: ${e.message}")
-        //logDebug("status = ${e.getResponse().getStatus().toInteger()}")
-        if(throwToCaller)
-        {
-            throw(e)
-        }
-    }
-}
-
-def httpExec(operation, params, throwToCaller = false)
-{
-    def res
+    def httpOp
     
     switch(operation)
     {
-        default:
-            logDebug("unsupported Http operation")
-        
-            if(throwToCaller)
-            {
-                throw new Exception("unsupported Http operation")
-            }
-            break
-        
-        case "POST":
-            res = httpPostExec(params, throwToCaller)
-            break
-        
-        case "GET":
-            res = httpGetExec(params, throwToCaller)
-            break
-        
         case "PATCH":
-            res = httpPatchExec(params, throwToCaller)
+            httpOp = this.delegate.&httpPatch
+            break
+        case "POST":
+            httpOp = this.delegate.&httpPost
+            break
+        case "GET":
+            httpOp = this.delegate.&httpGet
             break
     }
     
-    return res
+    httpOp(params, httpClosure)
+    return result
 }
 
 def httpExecWithAuthCheck(operation, params, throwToCaller = false)
@@ -637,7 +547,7 @@ def httpExecWithAuthCheck(operation, params, throwToCaller = false)
     def res
     try
     {
-        res = httpExec(operation, params, true)                
+        res = httpExec(operation, params)                
         return res
     }
     catch (Exception e)
@@ -660,7 +570,7 @@ def httpExecWithAuthCheck(operation, params, throwToCaller = false)
                     params['ignoreSSLIssues']= true
                 }
                 
-                res = httpExec(operation, params, true)
+                res = httpExec(operation, params)
                 return res
             }
             catch (Exception e2)
@@ -671,6 +581,10 @@ def httpExecWithAuthCheck(operation, params, throwToCaller = false)
                     throw(e2)
                 }
             }
+        }
+        else if(e.getResponse().getStatus().toInteger() == 403)
+        {
+            log.error "Operation failed.  Check account permissions.  (${params?.body})"
         }
         else
         {
@@ -703,12 +617,70 @@ private repackHeaderAsMap(header)
         ]
 }
 
-@Field static Integer pyErrorCount = 0
+import groovy.transform.Field
+
+@Field String actionAdd        = '"action":"add"'.getBytes()?.encodeHex()?.toString()
+@Field String actionUpdate     = '"action":"update"'.getBytes()?.encodeHex()?.toString()
+@Field String modelKeyCamera   = '"modelKey":"camera"'.getBytes()?.encodeHex()?.toString()
+@Field String modelKeyEvent    = '"modelKey":"event"'.getBytes()?.encodeHex()?.toString()
+@Field String modelKeyLight    = '"modelKey":"light"'.getBytes()?.encodeHex()?.toString()
+
+@Field String eventValueRing            = '"ring"'.getBytes()?.encodeHex()?.toString()
+@Field String isDarkKey                 = '"isDark"'.getBytes()?.encodeHex()?.toString()
+@Field String isLightOnKey              = '"isLightOn"'.getBytes()?.encodeHex()?.toString()
+@Field String isMotionDetectedKey       = '"isMotionDetected"'.getBytes()?.encodeHex()?.toString()
+@Field String isSmartDetectedKey        = '"isSmartDetected"'.getBytes()?.encodeHex()?.toString()
+@Field String ledSettingsKey            = '"ledSettings"'.getBytes()?.encodeHex()?.toString()
+@Field String lightDeviceSettingsKey    = '"lightDeviceSettings"'.getBytes()?.encodeHex()?.toString()
+@Field String smartDetectTypesKey       = '"smartDetectTypes"'.getBytes()?.encodeHex()?.toString()
+
+def coarsePacketValidate(hexString)
+{
+    // Beware: this is coarse and potentially brittle.  Check here first if you are not seeing packets that you think you should!
+    
+    // Before doing any other processing, try to determine if this packet contains useful updates.
+    // This is to limit the processing utilization on Hubitat since the Protect controller is so chatty.
+    
+    // Try to evaluate these in order of frequency and time criticality -- any Event, then any Camera update, then any Light update.
+    
+    def localStr = hexString?.toLowerCase()
+    if(!localStr) { return null }
+    
+    def searchList
+    
+    if( localStr.contains(modelKeyEvent) && localStr.contains(actionAdd) )
+    {
+        // "event" and "add"
+        searchList = [smartDetectTypesKey, eventValueRing]
+    }
+    
+    if( localStr.contains(modelKeyCamera) && localStr.contains(actionUpdate) )
+    {
+        // "camera" and "update"
+        searchList = [isDarkKey, isMotionDetectedKey, isSmartDetectedKey, ledSettingsKey]
+    }
+    
+    if( hexString.contains(modelKeyLight) && hexString.contains(actionUpdate) )
+    {
+        // "light" and "update"
+        searchList = [isDarkKey, isLightOnKey, isMotionDetectedKey, lightDeviceSettingsKey]
+    }
+    
+    return searchList?.any { localStr.contains(it) }
+}
 
 private packetValidateAndDecode(hexString)
 {
-    // all of this is based on the packet formats described here:  https://github.com/hjdhjd/homebridge-unifi-protect/blob/master/src/protect-api-updates.ts
+    if(!disablePreFiltering)
+    {
+        if(!coarsePacketValidate(hexString))
+        {
+            //log.debug "dropped packet: ${new String(hubitat.helper.HexUtils.hexStringToByteArray(hexString))}"
+            return
+        }
+    }
     
+    // all of this is based on the packet formats described here:  https://github.com/hjdhjd/unifi-protect/blob/main/src/protect-api-updates.ts
     def actionHeader
     def actionLength
     def dataHeader
@@ -731,19 +703,12 @@ private packetValidateAndDecode(hexString)
         dataLength = hubitat.helper.HexUtils.hexStringToInt(hubitat.helper.HexUtils.byteArrayToHexString(subBytes(dataHeader, 4, 4)))
         
         def totalLength = actionHeader.size() + actionLength + dataHeader.size() + dataLength
-        
         //logDebug("totalLength = ${totalLength}")
         //logDebug("bytes.size() = ${bytes.size()}")
         
         if(totalLength != bytes.size())
         {
             throw new Exception("Header/Packet mismatch.")
-        }
-        
-        if(dataLength > 0x180)
-        {
-            // presumed status packet, which introduces processing overhead due to chattiness
-            return null
         }
     }
     catch (Exception e)
@@ -769,23 +734,12 @@ private packetValidateAndDecode(hexString)
         
         //logDebug("actionHeaderMap = ${actionHeaderMap}")
         //logDebug("actionPacket = ${actionPacket}")
+
+        def actionJson = actionHeaderMap.deflated?.getAt(0) ? decompress(actionPacket) : makeString(actionPacket)
+        def actionJsonMap = slurper.parseText(actionJson?.toString())
         
-        def actionJson = (actionHeaderMap.deflated?.getAt(0) ? decompress(actionPacket) : makeString(actionPacket))
-        def actionJsonMap = slurper.parseText(actionJson.toString())
-        
-        // pre-check whether this is a packet we want to further decode...
-        def isInterestingPacket =
-            (
-            (actionJsonMap?.modelKey?.toString() == "camera" &&
-            actionJsonMap?.action?.toString() == "update")
-                ||
-            (actionJsonMap?.modelKey?.toString() == "event" &&
-            actionJsonMap?.action?.toString() == "add")                
-            )
-        
-        // ...if not, bail out to avoid unnecessary processing
-        def dataJson = isInterestingPacket ? (dataHeaderMap.deflated?.getAt(0) ? decompress(dataPacket) : makeString(dataPacket)) : null
-        def dataJsonMap = isInterestingPacket ? (slurper.parseText(dataJson.toString())) : null
+        def dataJson = dataHeaderMap.deflated?.getAt(0) ? decompress(dataPacket) : makeString(dataPacket)
+        def dataJsonMap = slurper.parseText(dataJson?.toString())
         
         def decodedPacket =
             [
@@ -793,27 +747,9 @@ private packetValidateAndDecode(hexString)
                 dataPacket: [dataHeader: dataHeaderMap, dataPayload: dataJsonMap]
             ]
         
-        //logDebug("decodedPacket = ${decodedPacket}")
-        
-        // reset our error count if we got this far
-        pyErrorCount = 0
-        
+        //logDebug("decodedPacket = ${decodedPacket}")        
         return decodedPacket
     }
-    catch (ConnectException e)
-    {
-        // connection error -- assume that server.py is offline.
-        // give it up to 3 tries, then close event stream and alert user
-        pyErrorCount++
-        if(pyErrorCount >= 3)
-        {
-            closeEventSocket()
-            log.debug "Communication error with server.py.  Correct error and then run Initialize()."
-            sendEvent(name: "commStatus", value: "no events")
-        }            
-            
-        return null
-    } 
     catch (Exception e)
     {
         logDebug("packet decoding failed: ${e.message}")
@@ -822,57 +758,15 @@ private packetValidateAndDecode(hexString)
     }
 }
 
-def checkForMinVers(vers)
-{
-    def splitTestVers = vers?.tokenize('.')
-    def splitCurVers = getLocation()?.getHub()?.firmwareVersionString?.tokenize('.')
-    
-    if(splitTestVers.size() != splitCurVers.size())
-    {
-        // something is wrong, so bail
-        return false
-    }
-    
-    def testVers = (splitTestVers.collect { String.format( "%04d", it.toInteger() ) })?.join()
-    def curVers = (splitCurVers.collect { String.format( "%04d", it.toInteger() ) })?.join()
-    
-    return (curVers >= testVers)
-}
-
-def localDecompressSupported()
-{
-    checkForMinVers("2.2.8.143")
-}
-
-private decompress(s)
-{
-    if(localDecompressSupported())
-    {
-        decompressLocal(s)
-    }
-    else
-    {
-        decompressRemote(s)
-    }
-}
-
 private makeString(s)
 {
     return new String(hubitat.helper.HexUtils.hexStringToByteArray(s))
 }
 
-private decompressRemote(s)
-{
-    // emulate zlib.decompress method
-    // bounces data off of server running server.py
-    
-    return httpExec("POST", [uri: "http://${rpiIP}:${rpiPort}", body: s], true)?.data
-}
-
 import java.io.ByteArrayOutputStream
 import java.util.zip.Inflater
 
-private decompressLocal(s)
+private decompress(s)
 {
     // based on this example: https://dzone.com/articles/how-compress-and-uncompress    
     def sBytes = hubitat.helper.HexUtils.hexStringToByteArray(s)
@@ -893,7 +787,7 @@ private decompressLocal(s)
     outputStream.close()
     
     def resp = new String(outputStream.toByteArray())    
-    //logDebug("decompressLocal resp = ${resp}")
+    //logDebug("decompress resp = ${resp}")
     
     return resp
 }
