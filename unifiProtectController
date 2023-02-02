@@ -675,7 +675,7 @@ private packetValidateAndDecode(hexString)
     {
         if(!coarsePacketValidate(hexString))
         {
-            //log.debug "dropped packet: ${new String(hubitat.helper.HexUtils.hexStringToByteArray(hexString))}"
+            //logDebug("dropped packet: ${new String(hubitat.helper.HexUtils.hexStringToByteArray(hexString))}")
             return
         }
     }
