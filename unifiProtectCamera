@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.4.2 - tomw - Image file handling improvements, including direct viewing in browser from File Manager
 1.4.0 - tomw - Store images from 'take' in File Manager
 1.3.9 - tomw - Save snapWidth and snapHeight to device data, for use by imageServerApp
 1.3.8 - tomw - Add camera LED indicator control (capability Switch)
@@ -214,7 +215,9 @@ def take(lens = "main")
             byte[] imageArr = new byte[bSize]
             stream.read(imageArr, 0, bSize)
             
+            deleteImageFile(currentImageFile())
             writeImageToFile(imageArr)
+            
             sendEvent(name: "image", value: "file:${fileName()}", isStateChange: true)
             sendEvent(name: "imageTimestamp", value: now())
         }
@@ -301,7 +304,7 @@ def getCameraSnapSuffix(lens = "main")
 
 def fileName()
 {
-    return device.getDeviceNetworkId()
+    return [device.getDisplayName()?.replace(" ", "_") ?: "", device.getDeviceNetworkId()].join("_") + ".jpg"
 }
 
 def writeImageToFile(byte[] image)
@@ -313,5 +316,18 @@ def writeImageToFile(byte[] image)
 
 def deleteImageFile(fileName = fileName())
 {
+    if(invalidImageVals().contains(fileName)) { return }
+    
     deleteHubFile(fileName)
+}
+
+def currentImageFile()
+{
+    return device.currentValue("image")?.replace("file:", "")
+}
+
+def invalidImageVals()
+{
+    // "n/a" is the default state after clearImages()
+    return [null, "n/a"]
 }
