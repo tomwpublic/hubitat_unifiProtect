@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.4.3 - tomw - Bugfixes
 1.4.1 - tomw - Performance improvements to reduce hub load
 1.3.7 - tomw - Support G4 Doorbell Pro
 1.3.6 - tomw - Improved event handling
@@ -109,7 +110,7 @@ def refresh()
     readBootstrap()
     
     // update child devices with current states
-    (getBootstrap()?.cameras + getBoostrap?.lights)?.each
+    (getBootstrap()?.cameras + getBootstrap()?.lights)?.each
     {
         processEvents(it?.id, it)  
     }
@@ -249,7 +250,7 @@ def refreshCookie()
 
 def createChildDevices()
 {
-    getBootstrap().cameras?.each
+    getBootstrap()?.cameras?.each
     {
         if((it.name && it.id) && !findChildDevice(it.id, "motion"))
         {
@@ -262,7 +263,7 @@ def createChildDevices()
         }
     }
     
-    getBootstrap().lights?.each
+    getBootstrap()?.lights?.each
     {
         if((it.name && it.id) && !findChildDevice(it.id, "light"))
         {

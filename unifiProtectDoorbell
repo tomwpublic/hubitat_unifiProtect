@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.4.3 - tomw - Added adjustChimeType command.  Can be used to disable and enable chimes in automations.
 1.3.6 - tomw - Improved event handling
 1.3.4 - tomw - Added light support and "isDark" attribute on cameras and lights
 1.2.0 - tomw - Added doorbell LCD message support
@@ -34,6 +35,12 @@ metadata
         
         command "push", ["number"]
         command "clearNotification"
+        
+        command "adjustChimeType", 
+            [[name: "Chime type to set*", type:"ENUM", constraints: knownChimeTypes().keySet()], 
+             [name: "Chime duration in msec (only applies to digital)", type:"NUMBER"]]
+        
+        attribute "chimeDuration", "number"
     }
 }
 
@@ -54,6 +61,11 @@ def processEvent(event)
     {
         push(1)
     }
+    
+    if(null != event.chimeDuration)
+    {
+        sendEvent(name: "chimeDuration", value: event.chimeDuration)
+    }
 }
 
 def push(number = 1)
@@ -69,6 +81,46 @@ def deviceNotification(text)
 def clearNotification()
 {
     updateDoorbell([lcdMessage: [resetAt: 0]])
+}
+
+def adjustChimeType(String type = "none", duration = 1000)
+{
+    try
+    {
+        if(!knownChimeTypes().keySet().contains(type))
+        {
+            throw new Exception("\"${type}\" chime type not supported")
+        }
+        
+        def actualDuration = knownChimeTypes()?.getAt(type)
+        
+        if(type == "digital")
+        {
+            // use the command input, but bound it to the range of 1s to 10s
+            actualDuration = ((duration < 1000) || (duration > 10000)) ? actualDuration : duration
+        }
+        
+        updateDoorbell([chimeDuration: actualDuration])
+        
+        // request a refresh from the parent so our update is reflected
+        parent?.refresh()
+    }
+    catch (Exception e)
+    {
+        log.warn e.message
+    }
+}
+
+def knownChimeTypes()
+{
+    def chimes = 
+        [
+            "none": 0,
+            "mechanical": 300,
+            "digital": 1000
+        ]
+    
+    return chimes
 }
 
 def updateDoorbell(dataMap)
