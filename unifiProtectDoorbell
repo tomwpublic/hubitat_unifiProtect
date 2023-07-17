@@ -39,6 +39,8 @@ metadata
         command "adjustChimeType", 
             [[name: "Chime type to set*", type:"ENUM", constraints: knownChimeTypes().keySet()], 
              [name: "Chime duration in msec (only applies to digital)", type:"NUMBER"]]
+        
+        attribute "chimeDuration", "number"
     }
 }
 
@@ -58,6 +60,11 @@ def processEvent(event)
     if(event.type == "ring")
     {
         push(1)
+    }
+    
+    if(null != event.chimeDuration)
+    {
+        sendEvent(name: "chimeDuration", value: event.chimeDuration)
     }
 }
 
@@ -94,6 +101,9 @@ def adjustChimeType(String type = "none", duration = 1000)
         }
         
         updateDoorbell([chimeDuration: actualDuration])
+        
+        // request a refresh from the parent so our update is reflected
+        parent?.refresh()
     }
     catch (Exception e)
     {
