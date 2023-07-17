@@ -109,7 +109,7 @@ def refresh()
     readBootstrap()
     
     // update child devices with current states
-    (getBootstrap()?.cameras + getBoostrap?.lights)?.each
+    (getBootstrap()?.cameras + getBootstrap?.lights)?.each
     {
         processEvents(it?.id, it)  
     }
@@ -249,7 +249,7 @@ def refreshCookie()
 
 def createChildDevices()
 {
-    getBootstrap().cameras?.each
+    getBootstrap()?.cameras?.each
     {
         if((it.name && it.id) && !findChildDevice(it.id, "motion"))
         {
@@ -262,7 +262,7 @@ def createChildDevices()
         }
     }
     
-    getBootstrap().lights?.each
+    getBootstrap()?.lights?.each
     {
         if((it.name && it.id) && !findChildDevice(it.id, "light"))
         {
