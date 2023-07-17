@@ -109,7 +109,7 @@ def refresh()
     readBootstrap()
     
     // update child devices with current states
-    (getBootstrap()?.cameras + getBootstrap?.lights)?.each
+    (getBootstrap()?.cameras + getBootstrap()?.lights)?.each
     {
         processEvents(it?.id, it)  
     }
