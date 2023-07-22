@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.4.4 - tomw - Bugfixes for camera event handling
 1.4.2 - tomw - Image file handling improvements, including direct viewing in browser from File Manager
 1.4.0 - tomw - Store images from 'take' in File Manager
 1.3.9 - tomw - Save snapWidth and snapHeight to device data, for use by imageServerApp
@@ -66,9 +67,6 @@ preferences
 
 def installed()
 {
-    sendEvent(name: "motion", value: "inactive")
-    sendEvent(name: "smartDetectType", value: "n/a")
-    
     device.updateSetting("snapWidth", 640)
     device.updateSetting("snapHeight", 360)
     
@@ -121,7 +119,7 @@ def processEvent(event)
     
     if(null != event.isSmartDetected)
     {
-        if(!event.isSmartDetected)
+        if(hasSmartDetect() && !event.isSmartDetected)
         {
             smartDetectEvent(null)
         }
@@ -161,7 +159,7 @@ def checkCamInfo(ffPath)
         return state.getAt(ffPath)
     }
     
-    def cam = getParent()?.getBootstrap()?.cameras.find() { it.id == getCameraId()}
+    def cam = getParent()?.getBootstrap()?.cameras.find() { it.id == getCameraId() }
     if(cam)
     {
         def val = cam.featureFlags?.getAt(ffPath)
