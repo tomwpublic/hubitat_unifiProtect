@@ -118,7 +118,7 @@ def refresh()
     
     devsToRefresh.each
     {
-        it.each { processEvents(it.id, it) }
+        it?.each { processEvents(it.id, it) }
     }
 }
 
@@ -670,10 +670,7 @@ private repackHeaderAsMap(header)
 
 import groovy.transform.Field
 
-def encHexMacro(string)
-{
-    return string.getBytes()?.encodeHex()?.toString()
-}
+def encHexMacro(string) { return string.getBytes()?.encodeHex()?.toString() }
 
 @Field String actionAdd        = encHexMacro('"action":"add"')
 @Field String actionUpdate     = encHexMacro('"action":"update"')
@@ -700,9 +697,7 @@ def coarsePacketValidate(hexString)
     // Beware: this is coarse and potentially brittle.  Check here first if you are not seeing packets that you think you should!
     
     // Before doing any other processing, try to determine if this packet contains useful updates.
-    // This is to limit the processing utilization on Hubitat since the Protect controller is so chatty.
-    
-    // Try to evaluate these in order of frequency and time criticality -- any Event, then any Camera update, then any Light update.
+    // This is to limit the processing utilization on Hubitat since the Protect controller is so chatty.    
     
     def localStr = hexString?.toLowerCase()
     if(!localStr) { return null }
