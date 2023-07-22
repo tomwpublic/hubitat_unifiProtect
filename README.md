@@ -2,8 +2,10 @@
 
 This provides various driver capabilities for Hubitat with UniFi Protect systems. Supported devices include:
 * cameras (Motion and ImageCapture capabilities, as well as Smart Detect for supported cameras)
+* chimes (AudioVolume and Switch capabilities, for adjusting Protect Chime volume)
 * doorbells (Motion, Notification (LCD screen message), and PushableButton (for doorbell button presses))
 * lights (Motion, Switch, and SwitchLevel (for dimming the light))
+* viewers (for selecting ViewPort views based on saved liveviews)
 * *more capabilities may be added over time.*
 <br><br>
 
