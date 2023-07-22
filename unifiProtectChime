@@ -1,0 +1,150 @@
+/*
+
+Copyright 2023 - tomw
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+-------------------------------------------
+
+Change history:
+
+1.4.4(dev) - tomw - Support chimes and viewports
+
+*/
+
+metadata
+{
+    definition(name: "UniFi Protect Chime", namespace: "tomw", author: "tomw", importUrl: "")
+    {
+        capability "AudioVolume"
+        capability "Switch"
+        
+        command "testChime"
+        
+        attribute "previousVolume", "number"
+    }
+}
+
+def processEvent(event)
+{
+    if(!event)
+    {
+        return
+    }
+
+    def events = [[:]]
+    if(null != event.volume)
+    {
+        def isUnmuted = event.volume > 0
+        
+        events += [name: "mute", value: isUnmuted ? "unmuted" : "muted"]
+        events += [name: "volume", value: event.volume]
+
+        events += [name: "switch", value: isUnmuted ? "on" : "off"]
+    }
+    
+    events.each
+    {
+        sendEvent(it)
+    }
+}
+
+def volumeDown()
+{
+    setVolume(currentVolume() - 5)
+}
+
+def volumeUp()
+{
+    setVolume(currentVolume() + 5)
+}
+
+def mute()
+{
+    setVolume(0, true)
+}
+
+def unmute()
+{
+    setVolume(previousVolume())
+}
+
+def on()
+{
+    unmute()
+}
+
+def off()
+{
+    mute()    
+}
+
+def setVolume(volume, isMute = false)
+{
+    if(null == volume) { return }
+    
+    // bound to [0..100]
+    volume = (volume > 100) ? 100 : ((volume < 0) ? 0 : volume)
+    
+    updateChime([volume: volume])
+    
+    if(!isMute)
+    {
+        // we need this for things like unmute()
+        sendEvent(name: "previousVolume", value: currentVolume())
+    }
+}
+
+def currentVolume()
+{
+    // return 0 if this is 0 or null
+    return device.currentValue("volume") ?: 0
+}
+
+def previousVolume()
+{
+    // return 0 if this is 0 or null
+    return device.currentValue("previousVolume") ?: 0
+}
+
+def updateChime(dataMap)
+{
+    try
+    {
+        getParent()?.httpExecWithAuthCheck("PATCH", parent?.genParamsMain(getChimesUrlSuffix(), new groovy.json.JsonOutput().toJson(dataMap)), true)
+    }
+    catch (Exception e)
+    {
+        log.debug "updateChime(${dataMap}) failed: ${e.message}"
+    }
+}
+
+def testChime()
+{
+    try
+    {
+        getParent()?.httpExecWithAuthCheck("POST", parent?.genParamsMain(getChimesUrlSuffix() + "/play-speaker"), true)
+    }
+    catch (Exception e)
+    {
+        log.debug "testChime() failed: ${e.message}"
+    }
+}
+
+def getChimesUrlSuffix()
+{
+    def id = device.getDeviceNetworkId()?.split('-')?.getAt(0)
+    def baseUrlSuffix = "/proxy/protect/api/chimes/" + id
+    
+    return baseUrlSuffix
+}
