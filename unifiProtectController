@@ -425,7 +425,7 @@ def findChildDevice(id, deviceType)
 def childTypeTranslation()
 {
     // this translates the deviceType attribute I injected into bootstrap into the names of
-    //   the drivers
+    //   the drivers (plus 'doorbell' as a special extension for cameras)
     return [ chime: "Chime", doorbell: "Doorbell", light: "Light",
           motion: "Camera", viewer: "Viewer" ]
 }
@@ -538,8 +538,8 @@ def scrubBootstrap(bootstrap)
     def chimesKeysWhitelist = baseWhitelist + ['cameraIds', 'volume']
     def subChimes = bootstrap.chimes?.collect { it.subMap(chimesKeysWhitelist) + [typeName: "chime"] }
     
-    def viewsersKeysWhitelist = baseWhitelist + ['liveview']
-    def subViewers = bootstrap.viewers?.collect { it.subMap(viewsersKeysWhitelist) + [typeName: "viewer"] }
+    def viewersKeysWhitelist = baseWhitelist + ['liveview']
+    def subViewers = bootstrap.viewers?.collect { it.subMap(viewersKeysWhitelist) + [typeName: "viewer"] }
     
     def viewsKeysWhitelist = baseWhitelist
     def subLiveviews = bootstrap.liveviews?.collect { it.subMap(viewsKeysWhitelist) + [typeName: "liveview"] }
