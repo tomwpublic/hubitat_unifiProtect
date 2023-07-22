@@ -1,0 +1,96 @@
+/*
+
+Copyright 2023 - tomw
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+-------------------------------------------
+
+Change history:
+
+1.4.4 - tomw - Support chimes and viewports
+
+*/
+
+metadata
+{
+    definition(name: "UniFi Protect Viewer", namespace: "tomw", author: "tomw", importUrl: "")
+    {
+        command "selectLiveview", [[name:"Enter a liveview name or id*", type: "STRING"]]
+        
+        attribute "liveview", "string"
+    }
+}
+
+def processEvent(event)
+{
+    if(!event)
+    {
+        return
+    }
+    
+    if(null != event.liveview)
+    {
+        def liveview = lookupLiveview(event.liveview)
+        sendEvent(name: "liveview", value: liveview?.name ?: "unknown name")
+    }
+}
+
+def lookupLiveview(liveview)
+{
+    // we don't get an event on liveviews changes, because we're a viewer (not a liveview)
+    // refresh the bootstrap (via the parent) in case there are new or changed liveviews
+    parent?.refresh()
+    
+    def liveviews = parent?.getBootstrap()?.liveviews
+    
+    // look first for a view with this name, or else look for one with this id
+    def actualLiveview = liveviews?.find { (liveview == it.name) ?: (liveview == it.id) }    
+    
+    if(!actualLiveview)
+    {
+        log.error "liveview not found: ${liveview}"
+    }
+    
+    return actualLiveview
+}
+
+def selectLiveview(liveview)
+{
+    def actualLiveview = lookupLiveview(liveview)
+    
+    if(actualLiveview?.id)
+    {
+        updateViewer([liveview: actualLiveview.id])
+    }
+}
+
+def updateViewer(dataMap)
+{
+    try
+    {
+        getParent()?.httpExecWithAuthCheck("PATCH", parent?.genParamsMain(getViewersUrlSuffix(), new groovy.json.JsonOutput().toJson(dataMap)), true)
+    }
+    catch (Exception e)
+    {
+        log.debug "updateViewer(${dataMap}) failed: ${e.message}"
+    }
+}
+
+def getViewersUrlSuffix()
+{
+    def id = device.getDeviceNetworkId()?.split('-')?.getAt(0)
+    def baseUrlSuffix = "/proxy/protect/api/viewers/" + id
+    
+    return baseUrlSuffix
+}
