@@ -49,9 +49,7 @@ def processEvent(event)
 def lookupLiveview(liveview)
 {
     // we don't get an event on liveviews changes, because we're a viewer (not a liveview)
-    // refresh the bootstrap (via the parent) in case there are new or changed liveviews
-    parent?.refresh()
-    
+    //   so this list may be stale until something calls refresh() on the parent 
     def liveviews = parent?.getBootstrap()?.liveviews
     
     // look first for a view with this name, or else look for one with this id
