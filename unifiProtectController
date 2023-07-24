@@ -18,7 +18,7 @@ limitations under the License.
 
 Change history:
 
-1.4.4(dev) - tomw - Support chimes and viewports
+1.4.4 - tomw - Support chimes and viewports
 1.4.3 - tomw - Bugfixes
 1.4.1 - tomw - Performance improvements to reduce hub load
 1.3.7 - tomw - Support G4 Doorbell Pro
