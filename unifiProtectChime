@@ -101,7 +101,7 @@ def setVolume(volume, isMute = false)
     if(!isMute)
     {
         // we need this for things like unmute()
-        sendEvent(name: "previousVolume", value: currentVolume())
+        sendEvent(name: "previousVolume", value: volume)
     }
 }
 
