@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.4.4 - tomw - Support chimes and viewports
 1.4.3 - tomw - Bugfixes
 1.4.1 - tomw - Performance improvements to reduce hub load
 1.3.7 - tomw - Support G4 Doorbell Pro
@@ -107,12 +108,17 @@ def initialize()
 
 def refresh()
 {
-    readBootstrap()
+    def bs = readBootstrap()
+    if(!bs) { return }
+    
     
     // update child devices with current states
-    (getBootstrap()?.cameras + getBootstrap()?.lights)?.each
+    def devsToRefresh =
+        [ bs.cameras, bs.chimes, bs.lights, bs.viewers ]
+    
+    devsToRefresh.each
     {
-        processEvents(it?.id, it)  
+        it?.each { processEvents(it.id, it) }
     }
 }
 
@@ -248,28 +254,35 @@ def refreshCookie()
     }
 }
 
-def createChildDevices()
+def manageChildDevice(it)
 {
-    getBootstrap()?.cameras?.each
+    if(!it) { return }
+    
+    if((it.name && it.id) && !findChildDevice(it.id, it.typeName))
     {
-        if((it.name && it.id) && !findChildDevice(it.id, "motion"))
-        {
-            createChildDevice(it.name, it.id, "motion")
-        }
-        
-        if((it.name && it.id) && !findChildDevice(it.id, "doorbell") && (["UVC G4 Doorbell", "UVC G4 Doorbell Pro"].contains(it.type?.toString())))
-        {
-            createChildDevice(it.name, it.id, "doorbell")
-        }
+        createChildDevice(it.name, it.id, it.typeName)
     }
     
-    getBootstrap()?.lights?.each
+    if((it.name && it.id) && !findChildDevice(it.id, "doorbell") && 
+       (it.featureFlags?.isDoorbell || it.type?.toLowerCase()?.contains("doorbell")))
     {
-        if((it.name && it.id) && !findChildDevice(it.id, "light"))
-        {
-            createChildDevice(it.name, it.id, "light")
-        }
+        // special case to create additional device for doorbells
+        createChildDevice(it.name, it.id, "doorbell")
     }
+}
+
+def createChildDevices()
+{
+    def bs = getBootstrap()
+    
+    // check for and create child devices for supported types
+    bs?.cameras?.each { manageChildDevice(it) }    
+    bs?.chimes?.each { manageChildDevice(it) }    
+    bs?.lights?.each { manageChildDevice(it) }    
+    bs?.viewers?.each { manageChildDevice(it) }
+    
+    // get initial states for all devices
+    refresh()
 }
 
 def deleteChildDevices()
@@ -361,14 +374,13 @@ def closeEventSocket()
 
 def parse(String message)
 {
-    //logDebug("parse: ${message}")
-    
+    //logDebug("parse: ${message}")    
     def packet = packetValidateAndDecode(message)
     
     if(packet)
     {
         if(
-            ["camera", "light"].contains(packet.actionPacket?.actionPayload?.modelKey?.toString()) &&
+            ["camera", "chime", "light", "viewer"].contains(packet.actionPacket?.actionPayload?.modelKey?.toString()) &&
             packet.actionPacket?.actionPayload?.action?.toString() == "update"
             )
         {
@@ -389,9 +401,10 @@ def parse(String message)
 
 def processEvents(id, event)
 {
-    findChildDevice(id, "doorbell")?.processEvent(event)
-    findChildDevice(id, "light")?.processEvent(event)
-    findChildDevice(id, "motion")?.processEvent(event)
+    childTypeTranslation()?.keySet()?.each
+    {
+        findChildDevice(id, it)?.processEvent(event)
+    }
 }
 
 def childName(name, deviceType)
@@ -409,28 +422,29 @@ def findChildDevice(id, deviceType)
     return getChildDevice(childDni(id, deviceType))
 }
 
+def childTypeTranslation()
+{
+    // this translates the deviceType attribute I injected into bootstrap into the names of
+    //   the drivers (plus 'doorbell' as a special extension for cameras)
+    return [ chime: "Chime", doorbell: "Doorbell", light: "Light",
+          motion: "Camera", viewer: "Viewer" ]
+}
+
 def createChildDevice(name, id, deviceType)
 {
+    // translate the metadata from getBootstrap() to what the driver names actually are
+    def typeAlias = childTypeTranslation()?.getAt(deviceType)
+    
     def child
     try
     {
-        switch(deviceType.toString())
-        {
-            case "motion":
-                addChildDevice("UniFi Protect Camera", childDni(id, deviceType), [name: childName(name, deviceType), label: childName(name, deviceType), isComponent: false])
-                break
-            
-            case "doorbell":
-                addChildDevice("UniFi Protect Doorbell", childDni(id, deviceType), [name: childName(name, deviceType), label: childName(name, deviceType), isComponent: false])
-                break
-            
-            case "light":
-                addChildDevice("UniFi Protect Light", childDni(id, deviceType), [name: childName(name, deviceType), label: childName(name, deviceType), isComponent: false])
-                break
-            
-            default:
-                logDebug("createChildDevice: deviceType not specified")
-        }
+        if(!typeAlias) { throw new Exception("Unknown device type: ${deviceType}") }
+        
+        addChildDevice("UniFi Protect " + typeAlias, childDni(id, deviceType), [name: childName(name, deviceType), label: childName(name, deviceType), isComponent: false])
+    }
+    catch(com.hubitat.app.exception.UnknownDeviceTypeException e)
+    {
+        log.info "Couldn't create device for ${name}.  Check to make sure this driver is installed: UniFi Protect ${typeAlias}"
     }
     catch (Exception e)
     {
@@ -483,15 +497,20 @@ def readBootstrap()
     try
     {
         def resp = httpExecWithAuthCheck("GET", genParamsMain(getBootstrapSuffix()), true)
+        
+        def subBootstrap
         if(resp)
         {
-            // only save the parts that we actually use
-            def subBootstrap = [cameras: resp.data.cameras, lights: resp.data.lights, lastUpdateId: resp.data.lastUpdateId]
+            //logDebug("FULL BOOTSTRAP FOLLOWS:")
+            //logDebug(resp.data)
             
+            subBootstrap = scrubBootstrap(resp.data)
             setBootstrap(subBootstrap)
         }
         
         sendEvent(name: "commStatus", value: "good")
+        
+        return subBootstrap
     }
     catch (Exception e)
     {
@@ -500,6 +519,37 @@ def readBootstrap()
         
         throw(e)
     }
+}
+
+def scrubBootstrap(bootstrap)
+{
+    if(!bootstrap) { return }
+    
+    // these are the keys we need for every device
+    def baseWhitelist = ['id', 'marketName', 'modelKey', 'name', 'type']
+    
+    def camerasKeysWhitelist = baseWhitelist + ['chimeDuration', 'featureFlags', 'isDark', 'isMotionDetected',
+                                                'isSmartDetected', 'lcdMessage', 'ledSettings', 'smartDetectTypes']
+    def subCameras = bootstrap.cameras?.collect { it.subMap(camerasKeysWhitelist) + [typeName: "motion"] }
+    
+    def lightsKeysWhitelist = baseWhitelist + ['isDark', 'isLightOn', 'isMotionDetected', 'lightDeviceSettings']
+    def subLights = bootstrap.lights?.collect { it.subMap(lightsKeysWhitelist) + [typeName: "light"] }
+    
+    def chimesKeysWhitelist = baseWhitelist + ['cameraIds', 'volume']
+    def subChimes = bootstrap.chimes?.collect { it.subMap(chimesKeysWhitelist) + [typeName: "chime"] }
+    
+    def viewersKeysWhitelist = baseWhitelist + ['liveview']
+    def subViewers = bootstrap.viewers?.collect { it.subMap(viewersKeysWhitelist) + [typeName: "viewer"] }
+    
+    def viewsKeysWhitelist = baseWhitelist
+    def subLiveviews = bootstrap.liveviews?.collect { it.subMap(viewsKeysWhitelist) + [typeName: "liveview"] }
+    
+    // only save the parts that we actually use
+    def subBootstrap = 
+        [cameras: subCameras, lights: subLights, chimes: subChimes,
+         viewers: subViewers, liveviews: subLiveviews, lastUpdateId: bootstrap.lastUpdateId]
+    
+    return subBootstrap
 }
 
 def setBootstrap(bootstrap)
@@ -620,29 +670,34 @@ private repackHeaderAsMap(header)
 
 import groovy.transform.Field
 
-@Field String actionAdd        = '"action":"add"'.getBytes()?.encodeHex()?.toString()
-@Field String actionUpdate     = '"action":"update"'.getBytes()?.encodeHex()?.toString()
-@Field String modelKeyCamera   = '"modelKey":"camera"'.getBytes()?.encodeHex()?.toString()
-@Field String modelKeyEvent    = '"modelKey":"event"'.getBytes()?.encodeHex()?.toString()
-@Field String modelKeyLight    = '"modelKey":"light"'.getBytes()?.encodeHex()?.toString()
+def encHexMacro(string) { return string.getBytes()?.encodeHex()?.toString() }
 
-@Field String eventValueRing            = '"ring"'.getBytes()?.encodeHex()?.toString()
-@Field String isDarkKey                 = '"isDark"'.getBytes()?.encodeHex()?.toString()
-@Field String isLightOnKey              = '"isLightOn"'.getBytes()?.encodeHex()?.toString()
-@Field String isMotionDetectedKey       = '"isMotionDetected"'.getBytes()?.encodeHex()?.toString()
-@Field String isSmartDetectedKey        = '"isSmartDetected"'.getBytes()?.encodeHex()?.toString()
-@Field String ledSettingsKey            = '"ledSettings"'.getBytes()?.encodeHex()?.toString()
-@Field String lightDeviceSettingsKey    = '"lightDeviceSettings"'.getBytes()?.encodeHex()?.toString()
-@Field String smartDetectTypesKey       = '"smartDetectTypes"'.getBytes()?.encodeHex()?.toString()
+@Field String actionAdd        = encHexMacro('"action":"add"')
+@Field String actionUpdate     = encHexMacro('"action":"update"')
+@Field String modelKeyCamera   = encHexMacro('"modelKey":"camera"')
+@Field String modelKeyChime    = encHexMacro('"modelKey":"chime"')
+@Field String modelKeyEvent    = encHexMacro('"modelKey":"event"')
+@Field String modelKeyLight    = encHexMacro('"modelKey":"light"')
+@Field String modelKeyViewer   = encHexMacro('"modelKey":"viewer"')
+
+@Field String eventValueRing            = encHexMacro('"ring"')
+@Field String isDarkKey                 = encHexMacro('"isDark"')
+@Field String isLightOnKey              = encHexMacro('"isLightOn"')
+@Field String isMotionDetectedKey       = encHexMacro('"isMotionDetected"')
+@Field String isSmartDetectedKey        = encHexMacro('"isSmartDetected"')
+@Field String lcdMessageKey             = encHexMacro('"lcdMessage"')
+@Field String ledSettingsKey            = encHexMacro('"ledSettings"')
+@Field String lightDeviceSettingsKey    = encHexMacro('"lightDeviceSettings"')
+@Field String liveviewKey               = encHexMacro('"liveview"')
+@Field String smartDetectTypesKey       = encHexMacro('"smartDetectTypes"')
+@Field String volumeKey                 = encHexMacro('"volume"')
 
 def coarsePacketValidate(hexString)
 {
     // Beware: this is coarse and potentially brittle.  Check here first if you are not seeing packets that you think you should!
     
     // Before doing any other processing, try to determine if this packet contains useful updates.
-    // This is to limit the processing utilization on Hubitat since the Protect controller is so chatty.
-    
-    // Try to evaluate these in order of frequency and time criticality -- any Event, then any Camera update, then any Light update.
+    // This is to limit the processing utilization on Hubitat since the Protect controller is so chatty.    
     
     def localStr = hexString?.toLowerCase()
     if(!localStr) { return null }
@@ -658,13 +713,25 @@ def coarsePacketValidate(hexString)
     if( localStr.contains(modelKeyCamera) && localStr.contains(actionUpdate) )
     {
         // "camera" and "update"
-        searchList = [isDarkKey, isMotionDetectedKey, isSmartDetectedKey, ledSettingsKey]
+        searchList = [isDarkKey, isMotionDetectedKey, isSmartDetectedKey, lcdMessageKey, ledSettingsKey]
     }
     
-    if( hexString.contains(modelKeyLight) && hexString.contains(actionUpdate) )
+    if( localStr.contains(modelKeyChime) && localStr.contains(actionUpdate) )
+    {
+        // "chime" and "update"
+        searchList = [volumeKey]
+    }
+    
+    if( localStr.contains(modelKeyLight) && localStr.contains(actionUpdate) )
     {
         // "light" and "update"
         searchList = [isDarkKey, isLightOnKey, isMotionDetectedKey, lightDeviceSettingsKey]
+    }
+    
+    if( localStr.contains(modelKeyViewer) && localStr.contains(actionUpdate) )
+    {
+        // "liveview" and "update"
+        searchList = [liveviewKey]
     }
     
     return searchList?.any { localStr.contains(it) }
