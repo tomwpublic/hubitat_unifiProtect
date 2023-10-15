@@ -532,7 +532,7 @@ def scrubBootstrap(bootstrap)
                                                 'isSmartDetected', 'lcdMessage', 'ledSettings', 'smartDetectTypes']
     def subCameras = bootstrap.cameras?.collect { it.subMap(camerasKeysWhitelist) + [typeName: "motion"] }
     
-    def lightsKeysWhitelist = baseWhitelist + ['isDark', 'isLightOn', 'isMotionDetected', 'lightDeviceSettings']
+    def lightsKeysWhitelist = baseWhitelist + ['isDark', 'isLightOn', 'isMotionDetected', 'isPirMotionDetected', 'lightDeviceSettings']
     def subLights = bootstrap.lights?.collect { it.subMap(lightsKeysWhitelist) + [typeName: "light"] }
     
     def chimesKeysWhitelist = baseWhitelist + ['cameraIds', 'volume']
@@ -684,6 +684,7 @@ def encHexMacro(string) { return string.getBytes()?.encodeHex()?.toString() }
 @Field String isDarkKey                 = encHexMacro('"isDark"')
 @Field String isLightOnKey              = encHexMacro('"isLightOn"')
 @Field String isMotionDetectedKey       = encHexMacro('"isMotionDetected"')
+@Field String isPirMotionDetectedKey    = encHexMacro('"isPirMotionDetected"')
 @Field String isSmartDetectedKey        = encHexMacro('"isSmartDetected"')
 @Field String lcdMessageKey             = encHexMacro('"lcdMessage"')
 @Field String ledSettingsKey            = encHexMacro('"ledSettings"')
@@ -725,7 +726,7 @@ def coarsePacketValidate(hexString)
     if( localStr.contains(modelKeyLight) && localStr.contains(actionUpdate) )
     {
         // "light" and "update"
-        searchList = [isDarkKey, isLightOnKey, isMotionDetectedKey, lightDeviceSettingsKey]
+        searchList = [isDarkKey, isLightOnKey, isMotionDetectedKey, isPirMotionDetectedKey, lightDeviceSettingsKey]
     }
     
     if( localStr.contains(modelKeyViewer) && localStr.contains(actionUpdate) )
