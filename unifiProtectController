@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.4.5 - tomw - Bugfixes for motion on Lights
 1.4.4 - tomw - Support chimes and viewports
 1.4.3 - tomw - Bugfixes
 1.4.1 - tomw - Performance improvements to reduce hub load
