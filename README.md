@@ -17,7 +17,8 @@ Special thanks to @Bago for their troubleshooting help.
 
 # Manual Installation instructions:
 
-* In the *Drivers Code* section of Hubitat, add the unifiProtectController, unifiProtectCamera, and unifiProtectDoorbell drivers.  Optionally add the remaining drivers if your system contains those additional device types.
+* In the *Drivers Code* section of Hubitat, add the unifiProtectController, unifiProtectCamera, and unifiProtectDoorbell drivers.
+   * Optionally add the remaining drivers if your system contains those additional device types.
 * In the *Devices* section of Hubitat, add a *New Virtual Device* of type UniFi Protect Controller.
 * On the configuration page for the newly created *Device*, enter these details and Save:
     * username and password for your UniFi Protect controller
