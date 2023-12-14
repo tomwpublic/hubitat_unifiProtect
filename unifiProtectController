@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.4.6 - tomw - Bugfix for UniFi OS 3.2.x
 1.4.5 - tomw - Bugfixes for motion on Lights
 1.4.4 - tomw - Support chimes and viewports
 1.4.3 - tomw - Bugfixes
@@ -130,7 +131,7 @@ def genParamsAuth()
             uri: getBaseURI() + getLoginSuffix(),
             headers:
             [
-                'X-CSRF-Token': getCsrf()
+                (csrfTokenNameToSend()): getCsrf()
             ],
             
             contentType: "application/json",
@@ -150,7 +151,7 @@ def genParamsMain(suffix, body = null)
             headers:
             [
                 'Cookie': getCookie(),
-                'X-CSRF-Token': getCsrf()
+                (csrfTokenNameToSend()): getCsrf()
             ],
             ignoreSSLIssues: true,
         ]
@@ -203,6 +204,16 @@ def login()
     updateAuthTokensStore(resp)
 }
 
+def csrfTokenNameToMatch()
+{
+    return "X-CSRF-Token".toUpperCase()
+}
+
+def csrfTokenNameToSend()
+{
+    return "X-CSRF-Token"
+}
+
 def updateAuthTokensStore(resp)
 {
     if(resp)
@@ -211,7 +222,7 @@ def updateAuthTokensStore(resp)
         {
             //logDebug("header: ${it.getName()} == ${it.getValue()}")
             
-            if(it.getName()?.toString() == "X-CSRF-Token")
+            if(it.getName()?.toString()?.toUpperCase() == csrfTokenNameToMatch())
             {
                 setCsrf(it.getValue())
             }
@@ -614,7 +625,7 @@ def httpExecWithAuthCheck(operation, params, throwToCaller = false)
                 
                 // update with new Auth token
                 params['headers']['Cookie'] = getCookie()
-                params['headers']['X-CSRF-Token'] = getCsrf()
+                params['headers'][csrfTokenNameToSend()] = getCsrf()
                 
                 // workaround for bug?
                 if(null == params['ignoreSSLIssues'])
