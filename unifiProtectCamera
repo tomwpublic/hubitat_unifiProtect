@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.4.7 - tomw - Bugfixes for missing smart detect events
 1.4.4 - tomw - Bugfixes for camera event handling
 1.4.2 - tomw - Image file handling improvements, including direct viewing in browser from File Manager
 1.4.0 - tomw - Store images from 'take' in File Manager
@@ -131,13 +132,13 @@ def smartDetectEvent(smartDetectTypes)
     if(null == smartDetectTypes)
     {
         // clear event state to default value
-        sendEvent(name: "smartDetectType", value: "waiting")
+        safeSendEvent([name: "smartDetectType", value: "waiting"])
         return
     }
     
     smartDetectTypes.each
     {
-        sendEvent(name: "smartDetectType", value: it)
+        safeSendEvent([name: "smartDetectType", value: it])
     }
 }
 
@@ -294,6 +295,14 @@ def getCameraBaseUrl()
 def getCameraSnapSuffix(lens = "main")
 {
     return getCameraBaseUrl() + "/${knownLensUrls()?.getAt(lens)}?force=true&w=${snapWidth ?: 640}&h=${snapHeight ?: 360}"
+}
+
+void safeSendEvent(Map event)
+{
+    if(!event.keySet().containsAll(["name", "value"])) { return }
+    
+    if(device.currentValue(event.name) == event.value) { return }
+    sendEvent(event)
 }
 
 //////////////////////////////////////
