@@ -18,10 +18,10 @@ limitations under the License.
 
 Change history:
 
+1.4.7 - tomw - Bugfixes for missing smart detect events
 1.4.6 - tomw - Bugfix for UniFi OS 3.2.x
 1.4.5 - tomw - Bugfixes for motion on Lights
 1.4.4 - tomw - Support chimes and viewports
-1.4.3 - tomw - Bugfixes
 1.4.1 - tomw - Performance improvements to reduce hub load
 1.3.7 - tomw - Support G4 Doorbell Pro
 1.3.6 - tomw - Improved event handling
@@ -400,13 +400,17 @@ def parse(String message)
             processEvents(packet.actionPacket.actionPayload.id, packet.dataPacket?.dataPayload)
         }
         
-        if(
-            packet.actionPacket?.actionPayload?.modelKey?.toString() == "event" &&
-            packet.actionPacket?.actionPayload?.action?.toString() == "add"
-            )
+        if(packet.actionPacket?.actionPayload?.modelKey?.toString() == "event")
         {
-            // this is likely a Smart Detect event
-            processEvents(packet.dataPacket?.dataPayload?.camera, packet.dataPacket?.dataPayload)
+            def id =
+                packet.actionPacket?.actionPayload?.recordId ?: 
+                packet.dataPacket?.dataPayload?.camera
+            
+            if(id)
+            {
+                // this is likely a Smart Detect event
+                processEvents(id, packet.dataPacket?.dataPayload)
+            }
         }
     }
 }
@@ -717,9 +721,9 @@ def coarsePacketValidate(hexString)
     
     def searchList
     
-    if( localStr.contains(modelKeyEvent) && localStr.contains(actionAdd) )
+    if( localStr.contains(modelKeyEvent) )
     {
-        // "event" and "add"
+        // "event"
         searchList = [smartDetectTypesKey, eventValueRing]
     }
     
