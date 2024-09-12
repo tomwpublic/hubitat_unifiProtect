@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.4.8 - tomw - Bugfix for duplicate smart detect events
 1.4.7 - tomw - Bugfixes for missing smart detect events
 1.4.4 - tomw - Bugfixes for camera event handling
 1.4.2 - tomw - Image file handling improvements, including direct viewing in browser from File Manager
@@ -97,20 +98,9 @@ def processEvent(event)
         sendEvent(name: "isDark", value: event.isDark)        
     }
     
-    if(null != event.smartDetectTypes)
-    {
-        smartDetectEvent(event.smartDetectTypes)
-    }
-    
     if(null != event.isMotionDetected)
     {
         sendEvent(name: "motion", value: event.isMotionDetected ? "active" : "inactive")
-        
-        if(hasSmartDetect() && !event.isMotionDetected)
-        {
-            // fail safe -- if we don't have any motion, we definitely don't have smart motion
-            smartDetectEvent(null)
-        }        
     }
     
     if(null != event.ledSettings?.isEnabled)
@@ -118,12 +108,23 @@ def processEvent(event)
         sendEvent(name: "switch", value: event.ledSettings.isEnabled ? "on" : "off")
     }
     
-    if(null != event.isSmartDetected)
+    if(!hasSmartDetect()) { return }
+    
+    if(false == event.isSmartDetected)
     {
-        if(hasSmartDetect() && !event.isSmartDetected)
+        smartDetectEvent(null)
+        return
+    }
+    
+    if(null != event.smartDetectTypes)
+    {
+        if(null != event.metadata?.detectedAreas)
         {
-            smartDetectEvent(null)
+            // ignore extra events returned by newer versions of Protect
+            return
         }
+        
+        smartDetectEvent(event.smartDetectTypes)
     }
 }
 
