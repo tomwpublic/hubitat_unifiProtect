@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.4.9 - almulder - Bugfix for "MethodPointerExpression is not allowed" save error on newer Hubitat firmware.  httpExec() now calls httpGet/httpPost/httpPatch directly
 1.4.7 - tomw - Bugfixes for missing smart detect events
 1.4.6 - tomw - Bugfix for UniFi OS 3.2.x
 1.4.5 - tomw - Bugfixes for motion on Lights
@@ -590,22 +591,19 @@ def httpExec(operation, params)
         //logDebug("result.data = ${result.data}")
     }
     
-    def httpOp
-    
     switch(operation)
     {
         case "PATCH":
-            httpOp = this.delegate.&httpPatch
+            httpPatch(params, httpClosure)
             break
         case "POST":
-            httpOp = this.delegate.&httpPost
+            httpPost(params, httpClosure)
             break
         case "GET":
-            httpOp = this.delegate.&httpGet
+            httpGet(params, httpClosure)
             break
     }
     
-    httpOp(params, httpClosure)
     return result
 }
 
