@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.4.9 - almulder - Null-safe camera lookup in checkCamInfo() when bootstrap has no cameras
 1.4.8 - tomw - Bugfix for duplicate smart detect events
 1.4.7 - tomw - Bugfixes for missing smart detect events
 1.4.4 - tomw - Bugfixes for camera event handling
@@ -161,7 +162,7 @@ def checkCamInfo(ffPath)
         return state.getAt(ffPath)
     }
     
-    def cam = getParent()?.getBootstrap()?.cameras.find() { it.id == getCameraId() }
+    def cam = getParent()?.getBootstrap()?.cameras?.find { it.id == getCameraId() }
     if(cam)
     {
         def val = cam.featureFlags?.getAt(ffPath)
