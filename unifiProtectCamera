@@ -18,6 +18,7 @@ limitations under the License.
 
 Change history:
 
+1.4.9 - almulder - Bugfix for person/smart detect events never arriving on newer Protect versions: replaced the detectedAreas filter with per-event-id de-duplication
 1.4.8 - tomw - Bugfix for duplicate smart detect events
 1.4.7 - tomw - Bugfixes for missing smart detect events
 1.4.4 - tomw - Bugfixes for camera event handling
@@ -118,14 +119,27 @@ def processEvent(event)
     
     if(null != event.smartDetectTypes)
     {
-        if(null != event.metadata?.detectedAreas)
-        {
-            // ignore extra events returned by newer versions of Protect
-            return
-        }
-        
-        smartDetectEvent(event.smartDetectTypes)
+        // Protect sends several updates for the same detection, and newer versions attach
+        //   metadata.detectedAreas to all of them (even as an empty list).  Instead of dropping
+        //   events that have it, only pass along types we haven't already reported for this event id.
+        smartDetectEvent(newSmartDetectTypes(event))
     }
+}
+
+def newSmartDetectTypes(event)
+{
+    def types = event.smartDetectTypes
+    def id = event.id?.toString()
+    
+    if(!id) { return types }
+    
+    def alreadySent = (state.smartDetectId == id) ? (state.smartDetectSent ?: []) : []
+    def fresh = types.findAll { !alreadySent.contains(it) }
+    
+    state.smartDetectId = id
+    state.smartDetectSent = alreadySent + fresh
+    
+    return fresh
 }
 
 def smartDetectEvent(smartDetectTypes)
